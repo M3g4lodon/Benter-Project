@@ -1,9 +1,9 @@
 import numpy as np
 
-from machine_learning import WinningModel
+from machine_learning import AbstractWinningModel
 
 
-class RandomModel(WinningModel):
+class RandomModel(AbstractWinningModel):
     def get_n_horses_model(self, n_horses: int):
         class RandomBaseline:
             def __init__(self, n_horses: int):

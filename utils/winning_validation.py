@@ -3,17 +3,23 @@ from typing import Callable, Optional
 import numpy as np
 from scipy.stats import stats
 
-from machine_learning import WinningModel
+from machine_learning import AbstractWinningModel
 from machine_learning.baselines import RandomModel
 from utils import import_data
 
+
 # TODO error on unseen horses
 # TODO more metrics here https://gist.github.com/bwhite/3726239
-def _true_ordered_topk(rank, k:int):
+def _true_ordered_topk(rank, k: int):
     return np.argwhere(rank.argsort().argsort() <= (k - 1)).flatten()
 
+
 def exact_top_k(rank_race, rank_hat, k: int):
-    return np.all(rank_hat[_true_ordered_topk(rank=rank_race, k=k)] == rank_race[_true_ordered_topk(rank=rank_race, k=k)])
+    return np.all(
+        rank_hat[_true_ordered_topk(rank=rank_race, k=k)]
+        == rank_race[_true_ordered_topk(rank=rank_race, k=k)]
+    )
+
 
 def same_top_k(rank_race, rank_hat, k: int):
     return rank_hat[_true_ordered_topk(rank=rank_race, k=k)].max() <= k
@@ -22,9 +28,13 @@ def same_top_k(rank_race, rank_hat, k: int):
 def precision_at_k(rank_race, rank_hat, k: int):
     return np.mean(rank_hat[_true_ordered_topk(rank=rank_race, k=k)] <= k)
 
-def kappa_cohen_like(rank_race, rank_hat, k: Optional[int]=None):
+
+def kappa_cohen_like(rank_race, rank_hat, k: Optional[int] = None):
     n_horses = rank_race.shape[0]
-    return ((rank_hat[_true_ordered_topk(rank=rank_race, k=1)][0]==1)-1/n_horses)/(1-1/n_horses)
+    return (
+        (rank_hat[_true_ordered_topk(rank=rank_race, k=1)][0] == 1) - 1 / n_horses
+    ) / (1 - 1 / n_horses)
+
 
 # Predicted Proba of actual race results
 def compute_rank_proba(
@@ -56,15 +66,29 @@ def compute_rank_proba(
 
 
 def compute_validation_error(
-    source: str, k: int, validation_method: Callable, winning_model: WinningModel
-):
-    # TODO should return a dict with all validation methods info
+    source: str,
+    k: int,
+    validation_method: Callable,
+    winning_model: AbstractWinningModel,
+) -> dict:
     assert k > 1
 
     min_horse, max_horse = import_data.get_min_max_horse(source=source)
-
+    res = {
+        "source": source,
+        "k": k,
+        "validation_method": validation_method.__name__,
+        "winning_model": winning_model.__name__,
+        "n_horses_validations": {},
+        "min_horse": min_horse,
+        "max_horse": max_horse,
+    }
     if k > max_horse:
-        print(f"k={k} is above the maximum number of horse per race ({max_horse}")
+        message = f"k={k} is above the maximum number of horse per race ({max_horse}"
+        print(message)
+        res["message"] = message
+        return res
+
     np.random.seed(42)
 
     for n_horses in range(max(k, min_horse), max_horse + 1):
@@ -77,6 +101,7 @@ def compute_validation_error(
             source=source,
         )
         if x_race.size == 0:
+            res["n_horses_validations"][n_horses] = {"n_val_races": 0}
             continue
 
         y_hat = winning_model.predict(x=x_race)
@@ -112,29 +137,53 @@ def compute_validation_error(
         )
 
         if validation_method == exact_top_k:
-            message = f"top {k} in right order"
+            validation_name = f"top {k} in right order"
         elif validation_method == same_top_k:
-            message = f"top {k} w/o order"
+            validation_name = f"top {k} w/o order"
         else:
             assert validation_method == precision_at_k
-            message = f"precision at rank {k}"
+            validation_name = f"precision at rank {k}"
 
+        res["n_horses_validations"][n_horses] = {
+            "n_val_races": x_race.shape[0],
+            "validation_method_message": validation_name,
+            "validation_values": topk_arr,
+            "random_validation_values": random_topk_arr,
+            "odds_validation_values": odds_topk_arr,
+        }
         print(
-            f"For races w/ {n_horses} horses, {x_race.shape[0]} races in val, {message}: {np.mean(topk_arr):.3%} "
-            f"(Random: {np.mean(random_topk_arr):.3%}, Odds {np.mean(odds_topk_arr):.3%})"
+            f"For races w/ {n_horses} horses, "
+            f"{x_race.shape[0]} races in val, "
+            f"{validation_name}: {np.mean(topk_arr):.3%} "
+            f"(Random: {np.mean(random_topk_arr):.3%}, "
+            f"Odds {np.mean(odds_topk_arr):.3%})"
         )
+    return res
 
 
 def compute_predicted_proba_on_actual_races(
-    k: int, source: str, same_races_support: bool, winning_model: WinningModel
-):
+    k: int, source: str, same_races_support: bool, winning_model: AbstractWinningModel
+) -> dict:
     assert k > 1
 
     min_horse, max_horse = import_data.get_min_max_horse(source=source)
 
+    res = {
+        "source": source,
+        "k": k,
+        "same_races_support": same_races_support,
+        "winning_model": winning_model.__name__,
+        "min_horse": min_horse,
+        "max_horse": max_horse,
+        "n_horses_predicted_probas": {},
+    }
+
     if k > max_horse:
-        print(f"k={k} is above the maximum number of horse per race ({max_horse}")
-        return
+        message = f"k={k} is above the maximum number of horse per race ({max_horse}"
+        print(message)
+        res["message"] = message
+        return res
+
     np.random.seed(42)
 
     for n_horses in range(max(k, min_horse), max_horse + 1):
@@ -195,8 +244,16 @@ def compute_predicted_proba_on_actual_races(
             ]
         )
 
+        res[n_horses] = {
+            "predicted_probabilities": predicted_probas,
+            "random_probabilities": random_predicted_probas,
+            "odds_probabilities": odds_predicted_probas,
+            "race_odds_notna_index": race_odds_notna_index,
+        }
         print(
             f"Mean Predicted probas of actual race result: {predicted_probas.mean():.3%} "
             f"(Random: {random_predicted_probas.mean():.3%}, Odds: {odds_predicted_probas.mean():.3%})"
         )
         print()
+
+    return res

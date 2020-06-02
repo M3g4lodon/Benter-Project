@@ -7,7 +7,7 @@ import seaborn as sns
 from tqdm import tqdm
 
 from constants import PMU_BETTINGS
-from machine_learning import WinningModel
+from machine_learning import AbstractWinningModel
 from utils import import_data
 
 initial_capital = 100
@@ -22,7 +22,7 @@ def race_betting_proportional_positive_return(
     x_race: np.array,
     odds_race: np.array,
     track_take: float,
-    winning_model: WinningModel,
+    winning_model: AbstractWinningModel,
     capital_fraction: float,
 ) -> np.array:
     n_horses = x_race.shape[0]
@@ -47,7 +47,7 @@ def race_betting_best_expected_return(
     x_race: np.array,
     odds_race: np.array,
     track_take: float,
-    winning_model: WinningModel,
+    winning_model: AbstractWinningModel,
     capital_fraction: float,
 ) -> np.array:
     n_horses = x_race.shape[0]
@@ -70,7 +70,7 @@ def race_bettings_kelly(
     x_race: np.array,
     odds_race: np.array,
     track_take: float,
-    winning_model: WinningModel,
+    winning_model: AbstractWinningModel,
     capital_fraction: Optional[float],
 ) -> np.array:
     n_horses = x_race.shape[0]
@@ -108,7 +108,7 @@ def race_betting_proportional_winning_proba(
     x_race: np.array,
     odds_race: np.array,
     track_take: float,
-    winning_model: WinningModel,
+    winning_model: AbstractWinningModel,
     capital_fraction: float,
 ) -> np.array:
     n_horses = x_race.shape[0]
@@ -124,7 +124,7 @@ def race_betting_best_winning_proba(
     x_race: np.array,
     odds_rac: np.array,
     track_take: float,
-    winning_model: WinningModel,
+    winning_model: AbstractWinningModel,
     capital_fraction: float,
 ) -> np.array:
     n_horses = x_race.shape[0]
@@ -138,7 +138,7 @@ def race_betting_best_winning_proba(
 
 
 def race_random_one_horse(
-    x_race: np.array, odds_race: np.array, track_take: float,winning_model: WinningModel, capital_fraction: float,
+    x_race: np.array, odds_race: np.array, track_take: float,winning_model: AbstractWinningModel, capital_fraction: float,
 ) -> np.array:
     n_horses = x_race.shape[0]
     betting = np.random.rand(n_horses)
@@ -149,7 +149,7 @@ def race_random_one_horse(
 
 
 def race_random_all_horses(
-    x_race: np.array, odds_race: np.array, track_take: float,winning_model: WinningModel,, capital_fraction: float,
+    x_race: np.array, odds_race: np.array, track_take: float,winning_model: AbstractWinningModel,, capital_fraction: float,
 ) -> np.array:
     n_horses = x_race.shape[0]
     betting = np.ones((n_horses,)) / n_horses
@@ -158,7 +158,7 @@ def race_random_all_horses(
 
 
 def race_rickiest_horse(
-    x_race: np.array, odds_race: np.array, track_take: float,winning_model: WinningModel, capital_fraction: float,
+    x_race: np.array, odds_race: np.array, track_take: float,winning_model: AbstractWinningModel, capital_fraction: float,
 ) -> np.array:
     betting = odds_race == odds_race.max()
     betting = betting / np.sum(betting)
@@ -167,7 +167,7 @@ def race_rickiest_horse(
 
 
 def race_least_risky_horse(
-    x_race: np.array, odds_race: np.array, track_take: float,winning_model: WinningModel, capital_fraction: float,
+    x_race: np.array, odds_race: np.array, track_take: float,winning_model: AbstractWinningModel, capital_fraction: float,
 ) -> np.array:
     betting = odds_race == odds_race.min()
     betting = betting / np.sum(betting)
@@ -176,7 +176,7 @@ def race_least_risky_horse(
 
 
 def race_proportional_odds(
-    x_race: np.array, odds_race: np.array, track_take: float,winning_model: WinningModel, capital_fraction: float,
+    x_race: np.array, odds_race: np.array, track_take: float,winning_model: AbstractWinningModel, capital_fraction: float,
 ) -> np.array:
     betting = odds_race / np.sum(odds_race)
     betting = betting * capital_fraction
@@ -184,7 +184,7 @@ def race_proportional_odds(
 
 
 def race_proportional_pari_mutual_proba(
-    x_race: np.array, odds_race: np.array, track_take: float,winning_model: WinningModel, capital_fraction: float,
+    x_race: np.array, odds_race: np.array, track_take: float,winning_model: AbstractWinningModel, capital_fraction: float,
 ) -> np.array:
     betting = (1 / odds_race) / np.sum((1 / odds_race))
     betting = betting * capital_fraction
@@ -192,7 +192,7 @@ def race_proportional_pari_mutual_proba(
 
 
 def compute_expected_return(
-    compute_betting: Callable, source: str, code_pari: str, winning_model:WinningModel, show: bool = False
+    compute_betting: Callable, source: str, code_pari: str, winning_model:AbstractWinningModel, show: bool = False
 ) -> pd.DataFrame:
     """For each races, compute expected return (1 basis)
     Without taking into account the feedback effect"""
@@ -241,7 +241,7 @@ def compute_scenario(
     source: str,
     code_pari: str,
     capital_fraction: float,
-    winning_model:WinningModel,
+    winning_model:AbstractWinningModel,
     show: bool = False,
 ) -> pd.DataFrame:
     """Return scenario on validation dataset"""

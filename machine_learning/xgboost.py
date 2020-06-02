@@ -4,15 +4,14 @@ from xgboost import XGBClassifier
 import numpy as np
 
 from constants import SAVED_MODELS_DIR
-from machine_learning import WinningModel, ModelNotCreatedOnce
+from machine_learning import AbstractWinningModel, ModelNotCreatedOnce
 
 
 def check_if_xgboost_if_fitted(model: XGBClassifier) -> None:
     model.feature_importances_
 
 
-class XGBoostWinningModel(WinningModel):
-    name = "XGBoost"
+class XGBoostWinningModel(AbstractWinningModel):
 
     def __init__(self):
         self.n_horses_models = {}
@@ -35,21 +34,21 @@ class XGBoostWinningModel(WinningModel):
         )
 
     def save_model(self) -> None:
-        if self.name not in os.listdir(SAVED_MODELS_DIR):
-            os.mkdir(os.path.join(SAVED_MODELS_DIR, self.name))
+        if self.__name__ not in os.listdir(SAVED_MODELS_DIR):
+            os.mkdir(os.path.join(SAVED_MODELS_DIR, self.__name__))
         for n_horse, n_horse_model in self.n_horses_models.items():
             n_horse_model.save_model(
                 fname=os.path.join(
-                    SAVED_MODELS_DIR, self.__name__, f"{self.name}_{n_horse}.json"
+                    SAVED_MODELS_DIR, self.__name__, f"{self.__name__}_{n_horse}.json"
                 )
             )
 
     @classmethod
     def load_model(cls, trainable: bool) -> "XGBoostWinningModel":
         model = XGBoostWinningModel()
-        assert cls.name in os.listdir(SAVED_MODELS_DIR)
+        assert cls.__name__ in os.listdir(SAVED_MODELS_DIR)
         for filename in os.listdir(SAVED_MODELS_DIR):
-            if filename.startswith(cls.name):
+            if filename.startswith(cls.__name__):
                 n_horse = int(re.match(fr"{cls.name}_(\d*)\.json", filename).group(0))
                 model.n_horses_models[n_horse] = XGBClassifier().load_model(
                     fname=os.path.join(SAVED_MODELS_DIR, cls.__name__, filename)

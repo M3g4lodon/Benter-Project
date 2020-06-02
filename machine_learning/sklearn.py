@@ -7,11 +7,10 @@ import joblib
 import numpy as np
 
 from constants import SAVED_MODELS_DIR
-from machine_learning import WinningModel, ModelNotCreatedOnce
+from machine_learning import AbstractWinningModel, ModelNotCreatedOnce
 
 
-class KNNModel(WinningModel):
-    name = "K_Nearest_Neighbours"
+class KNNModel(AbstractWinningModel):
 
     def __init__(self):
         self.n_horses_models = {}
@@ -32,21 +31,21 @@ class KNNModel(WinningModel):
         return model.predict_proba(X=np.reshape(a=x, newshape=(x.shape[0], x.shape[1]*x.shape[2]), order="F"))
 
     def save_model(self) -> None:
-        if self.name not in os.listdir(SAVED_MODELS_DIR):
-            os.mkdir(os.path.join(SAVED_MODELS_DIR, self.name))
+        if self.__name__ not in os.listdir(SAVED_MODELS_DIR):
+            os.mkdir(os.path.join(SAVED_MODELS_DIR, self.__name__))
         for n_horse, n_horse_model in self.n_horses_models.items():
             joblib.dump(
                 n_horse_model,
-                os.path.join(SAVED_MODELS_DIR, self.__name__, f"{self.name}_{n_horse}.pickle"),
+                os.path.join(SAVED_MODELS_DIR, self.__name__, f"{self.__name__}_{n_horse}.pickle"),
             )
 
     @classmethod
     def load_model(cls, trainable: bool) -> "KNNModel":
         model = KNNModel()
-        assert cls.name in os.listdir(SAVED_MODELS_DIR)
+        assert cls.__name__ in os.listdir(SAVED_MODELS_DIR)
         for filename in os.listdir(SAVED_MODELS_DIR):
-            if filename.startswith(cls.name):
-                n_horse = int(re.match(fr"{cls.name}_(\d*)\.pickle", filename).group(0))
+            if filename.startswith(cls.__name__):
+                n_horse = int(re.match(fr"{cls.__name__}_(\d*)\.pickle", filename).group(0))
                 model.n_horses_models[n_horse] = joblib.load(
                     os.path.join(SAVED_MODELS_DIR,cls.__name__,  filename)
                 )

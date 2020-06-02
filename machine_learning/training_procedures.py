@@ -1,7 +1,7 @@
 import numpy as np
 from sklearn import metrics
 
-from machine_learning import WinningModel
+from machine_learning import AbstractWinningModel
 from utils import import_data
 
 
@@ -20,8 +20,8 @@ def _one_hot_encode(y, n_horses:int):
 # inspiration:
 # - https://www.kaggle.com/yyzz1010/predict-the-winning-horse-100-on-small-test-data
 def train_per_horse(
-    source: str, winning_model: WinningModel, verbose: bool = False
-) -> WinningModel:
+    source: str, winning_model: AbstractWinningModel, verbose: bool = False
+) -> AbstractWinningModel:
     """Train Sklearn-like model on each n_horses-size races."""
     min_horse, max_horse = import_data.get_min_max_horse(source=source)
 
@@ -94,8 +94,8 @@ def train_per_horse(
 
 
 def train_on_each_horse_with_epochs(
-    source: str, winning_model: WinningModel, n_epochs: int, verbose: bool = False
-) -> WinningModel:
+    source: str, winning_model: AbstractWinningModel, n_epochs: int, verbose: bool = False
+) -> AbstractWinningModel:
     """Train deep learning (tf.keras like) model of each n_horses on n_epochs"""
     min_horse, max_horse = import_data.get_min_max_horse(source=source)
     for epoch in range(n_epochs):
@@ -168,7 +168,7 @@ def train_on_each_horse_with_epochs(
 
 
 def train_on_all_races(
-    source: str, winning_model: WinningModel, n_epochs: int, verbose: bool = False
-) -> WinningModel:
+    source: str, winning_model: AbstractWinningModel, n_epochs: int, verbose: bool = False
+) -> AbstractWinningModel:
     """Only for deeplearning models (tf.keras like)"""
     pass

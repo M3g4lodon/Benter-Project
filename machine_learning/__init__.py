@@ -4,7 +4,8 @@ from abc import abstractmethod
 import numpy as np
 
 
-class WinningModel(metaclass=ABCMeta):
+class AbstractWinningModel(metaclass=ABCMeta):
+
     @abstractmethod
     def get_n_horses_model(self, n_horses: int):
         pass
@@ -20,7 +21,7 @@ class WinningModel(metaclass=ABCMeta):
 
     @classmethod
     @abstractmethod
-    def load_model(cls, trainable: bool) -> "WinningModel":
+    def load_model(cls, trainable: bool) -> "AbstractWinningModel":
         pass
 
 

@@ -1,9 +1,12 @@
-import functools
 from typing import Tuple
 
 import pandas as pd
+from joblib import Memory
 
+from constants import CACHE_DIR
 from utils.import_data import get_splitted_featured_data
+
+memory = Memory(location=CACHE_DIR, verbose=0)
 
 FEATURE_COLUMNS = [
     "is_pregnant",
@@ -76,7 +79,7 @@ NUMERICAL_FEATURES = [
 ]
 
 
-@functools.lru_cache(maxsize=None)
+@memory.cache
 def load_preprocess(source: str) -> Tuple[dict, dict]:
     train_race_horse_df, _, _ = get_splitted_featured_data(source=source)
     standard_scaler_parameters = {}
@@ -92,6 +95,19 @@ def load_preprocess(source: str) -> Tuple[dict, dict]:
     }
 
     return standard_scaler_parameters, ohe_features_values
+
+
+@memory.cache
+def get_n_preprocessed_feature_columns(source: str) -> int:
+    _, ohe_features_values = load_preprocess(source=source)
+    res = len(FEATURE_COLUMNS)
+    res = (
+        res
+        + sum(len(values) for values in ohe_features_values.values())
+        - len(TO_ONE_HOT_ENCODE_COLUMNS)
+    )
+    res = res + 2 - 1  # Unshod
+    return res
 
 
 def preprocess(race_horse_df: pd.DataFrame, source: str) -> pd.DataFrame:
@@ -123,15 +139,3 @@ def preprocess(race_horse_df: pd.DataFrame, source: str) -> pd.DataFrame:
     features_df.drop(["unshod"], inplace=True, axis=1)
 
     return features_df
-
-
-def get_n_preprocessed_feature_columns(source: str) -> int:
-    _, ohe_features_values = load_preprocess(source=source)
-    res = len(FEATURE_COLUMNS)
-    res = (
-        res
-        + sum(len(values) for values in ohe_features_values.values())
-        - len(TO_ONE_HOT_ENCODE_COLUMNS)
-    )
-    res = res + 2 - 1  # Unshod
-    return res

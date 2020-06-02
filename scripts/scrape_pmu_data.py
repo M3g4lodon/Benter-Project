@@ -102,7 +102,7 @@ def download_day_races(date: dt.date, replace_if_exists: bool = True) -> int:
                 "COMBINAISONS_INTERNET",
                 "CITATIONS_INTERNET",
                 "RAPPORTS_DEF_INTERNET",
-                "ENJEU_INTERNET"
+                "ENJEU_INTERNET",
             ]:
                 filename = os.path.join(
                     day_folder_path, f"R{r_i}_C{c_i}_{url_name.lower()}.json"
@@ -123,14 +123,20 @@ def download_day_races(date: dt.date, replace_if_exists: bool = True) -> int:
                         f"R{r_i}_C{c_i}_{code_pari}_{url_name.lower()}.json",
                     )
                     url = get_pmu_api_url(
-                        url_name=url_name, r_i=r_i, c_i=c_i, code_pari=code_pari, date=date
+                        url_name=url_name,
+                        r_i=r_i,
+                        c_i=c_i,
+                        code_pari=code_pari,
+                        date=date,
                     )
                     if (
                         replace_if_exists
                         or not os.path.exists(filename)
                         or not check_query_json(filename=filename, url=url)
                     ):
-                        utils.dump_json(data=execute_get_query(url=url), filename=filename)
+                        utils.dump_json(
+                            data=execute_get_query(url=url), filename=filename
+                        )
                         query_count += 1
 
     return query_count

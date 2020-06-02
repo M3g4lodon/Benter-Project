@@ -4,7 +4,7 @@ from xgboost import XGBClassifier
 import numpy as np
 
 from constants import SAVED_MODELS_DIR
-from machine_learning import AbstractWinningModel, ModelNotCreatedOnce
+from winning_horse_models import AbstractWinningModel, ModelNotCreatedOnceError
 
 
 def check_if_xgboost_if_fitted(model: XGBClassifier) -> None:
@@ -18,7 +18,7 @@ class XGBoostWinningModel(AbstractWinningModel):
 
     def get_n_horses_model(self, n_horses: int, should_be_fitted: bool = False)->XGBClassifier:
         if n_horses not in self.n_horses_models and should_be_fitted:
-            raise ModelNotCreatedOnce
+            raise ModelNotCreatedOnceError
         if n_horses not in self.n_horses_models:
             self.n_horses_models[n_horses] = XGBClassifier()
 
@@ -34,12 +34,12 @@ class XGBoostWinningModel(AbstractWinningModel):
         )
 
     def save_model(self) -> None:
-        if self.__name__ not in os.listdir(SAVED_MODELS_DIR):
-            os.mkdir(os.path.join(SAVED_MODELS_DIR, self.__name__))
+        if self.__class__.__name__ not in os.listdir(SAVED_MODELS_DIR):
+            os.mkdir(os.path.join(SAVED_MODELS_DIR, self.__class__.__name__))
         for n_horse, n_horse_model in self.n_horses_models.items():
             n_horse_model.save_model(
                 fname=os.path.join(
-                    SAVED_MODELS_DIR, self.__name__, f"{self.__name__}_{n_horse}.json"
+                    SAVED_MODELS_DIR, self.__class__.__name__, f"{self.__class__.__name__}_{n_horse}.json"
                 )
             )
 

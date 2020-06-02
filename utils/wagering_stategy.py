@@ -7,7 +7,7 @@ import seaborn as sns
 from tqdm import tqdm
 
 from constants import PMU_BETTINGS
-from machine_learning import AbstractWinningModel
+from winning_horse_models import AbstractWinningModel
 from utils import import_data
 
 initial_capital = 100
@@ -15,7 +15,7 @@ initial_capital = 100
 # TODO add more stat (max drawdown, look at master thesis, max number of losses, expexted return, return distribution,
 #  standard deviation of returns, EDA on returns to find bias, expected winning proba, average length of loss streak...)
 # TODO mininum betting of 150 (1.5€)
-# TODO add feedback effet of betting
+# TODO add feedback effect of betting
 
 
 def race_betting_proportional_positive_return(
@@ -149,7 +149,7 @@ def race_random_one_horse(
 
 
 def race_random_all_horses(
-    x_race: np.array, odds_race: np.array, track_take: float,winning_model: AbstractWinningModel,, capital_fraction: float,
+    x_race: np.array, odds_race: np.array, track_take: float,winning_model: AbstractWinningModel, capital_fraction: float,
 ) -> np.array:
     n_horses = x_race.shape[0]
     betting = np.ones((n_horses,)) / n_horses

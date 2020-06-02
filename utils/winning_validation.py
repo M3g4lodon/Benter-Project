@@ -3,8 +3,8 @@ from typing import Callable, Optional
 import numpy as np
 from scipy.stats import stats
 
-from machine_learning import AbstractWinningModel
-from machine_learning.baselines import RandomModel
+from winning_horse_models import AbstractWinningModel
+from winning_horse_models.baselines import RandomModel
 from utils import import_data
 
 
@@ -78,7 +78,7 @@ def compute_validation_error(
         "source": source,
         "k": k,
         "validation_method": validation_method.__name__,
-        "winning_model": winning_model.__name__,
+        "winning_model": winning_model.__class__.__name__,
         "n_horses_validations": {},
         "min_horse": min_horse,
         "max_horse": max_horse,
@@ -172,7 +172,7 @@ def compute_predicted_proba_on_actual_races(
         "source": source,
         "k": k,
         "same_races_support": same_races_support,
-        "winning_model": winning_model.__name__,
+        "winning_model": winning_model.__class__.__name__,
         "min_horse": min_horse,
         "max_horse": max_horse,
         "n_horses_predicted_probas": {},

@@ -1,4 +1,3 @@
-import functools
 import json
 import os
 
@@ -6,7 +5,7 @@ import tensorflow as tf
 import numpy as np
 
 from constants import SAVED_MODELS_DIR, SOURCE_PMU
-from machine_learning import AbstractWinningModel
+from winning_horse_models import AbstractWinningModel
 from utils import preprocess
 
 N_FEATURES = preprocess.get_n_preprocessed_feature_columns(source=SOURCE_PMU)
@@ -41,8 +40,8 @@ class LogisticRegressionModel(AbstractWinningModel):
         return model.predict(x=x)
 
     def save_model(self) -> None:
-        if self.__name__ not in os.listdir(SAVED_MODELS_DIR):
-            os.mkdir(os.path.join(SAVED_MODELS_DIR, self.__name__))
+        if self.__class__.__name__ not in os.listdir(SAVED_MODELS_DIR):
+            os.mkdir(os.path.join(SAVED_MODELS_DIR, self.__class__.__name__))
         weights, bias = self.shared_layer.get_weights()
 
         shared_layer = {
@@ -50,7 +49,7 @@ class LogisticRegressionModel(AbstractWinningModel):
             "bias": bias.tolist(),
             "config": self.shared_layer.get_config(),
         }
-        with open(os.path.join(SAVED_MODELS_DIR, self.__name__, "shared_weights.json"), "w+") as fp:
+        with open(os.path.join(SAVED_MODELS_DIR, self.__class__.__name__, "shared_weights.json"), "w+") as fp:
             json.dump(obj=shared_layer, fp=fp)
 
     @classmethod

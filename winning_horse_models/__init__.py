@@ -25,5 +25,5 @@ class AbstractWinningModel(metaclass=ABCMeta):
         pass
 
 
-class ModelNotCreatedOnce(Exception):
+class ModelNotCreatedOnceError(Exception):
     pass

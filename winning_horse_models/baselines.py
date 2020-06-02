@@ -1,6 +1,6 @@
 import numpy as np
 
-from machine_learning import AbstractWinningModel
+from winning_horse_models import AbstractWinningModel
 
 
 class RandomModel(AbstractWinningModel):

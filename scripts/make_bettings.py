@@ -6,17 +6,17 @@ import pandas as pd
 import pytz
 from tabulate import tabulate
 
-from constants import PMU_BETTINGS
+import wagering_stategies
+from constants import PMU_BETTINGS, SOURCE_PMU
 from scripts.generate_pmu_data import (
-    get_num_pmu_enjeu,
     convert_queried_data_to_race_horse_df,
+    get_num_pmu_enjeu_from_citations,
 )
 from scripts.scrape_pmu_data import get_pmu_api_url
 from utils.scrape import execute_get_query
 from utils import features
 from utils import import_data
-from utils import model as utils_model
-from utils import wagering_stategy
+from winning_horse_models.logistic_regression import LogisticRegressionModel
 
 TIMEZONE = "Europe/Paris"
 
@@ -24,45 +24,21 @@ code_pari = "E_SIMPLE_GAGNANT"
 capital_fraction = 0.01
 
 
-def get_num_pmu_citation_enjeu(citations: dict, pari_type: str):
-    if "listeCitations" not in citations:
-        return None
-    citations_ = [
-        citation
-        for citation in citations["listeCitations"]
-        if citation["typePari"] == code_pari
-    ]
-    assert len(citations_) <= 1
-    if not citations_:
-        return None
-    citation = citations_[0]
-    if "participants" not in citation:
-        return None
-
-    return {
-        part["numPmu"]: part["citations"][0]["enjeu"]
-        for part in citation["participants"]
-    }
-
-
 @functools.lru_cache(maxsize=None)
 def _variables_to_query_once():
     print("Setting up constants variables")
     historical_race_horse_df = import_data.load_featured_data(source="PMU")
 
-    utils_model.load_shared_layers(trainable=False)
+    winning_model = LogisticRegressionModel.load_model(trainable=False)
     print("Winning Horse model is loaded")
     track_take = [betting for betting in PMU_BETTINGS if betting.name == code_pari][0][
         1
     ]
-    return historical_race_horse_df, track_take
+    return historical_race_horse_df, track_take, winning_model
 
 
 def suggest_betting_on_next_race():
-    (
-        historical_race_horse_df,
-        track_take,
-    ) = _variables_to_query_once()
+    (historical_race_horse_df, track_take, winning_model) = _variables_to_query_once()
 
     date = dt.date.today()
 
@@ -124,19 +100,12 @@ def suggest_betting_on_next_race():
         for num_part in incident["numeroParticipants"]
     }
 
-    combinaisons = execute_get_query(
-        url=get_pmu_api_url(url_name="COMBINAISONS", date=date, r_i=r_i, c_i=c_i)
-        + "?specialisation=INTERNET"
-    )
     citations = execute_get_query(
         url=get_pmu_api_url(url_name="CITATIONS", date=date, r_i=r_i, c_i=c_i)
         + "?specialisation=INTERNET"
     )
-    num_pmu_enjeu = get_num_pmu_enjeu(
-        combinaisons=combinaisons, pari_type="E_SIMPLE_GAGNANT"
-    )
 
-    num_pmu_citation_enjeu = get_num_pmu_citation_enjeu(
+    num_pmu_citation_enjeu = get_num_pmu_enjeu_from_citations(
         citations=citations, pari_type="E_SIMPLE_GAGNANT"
     )
 
@@ -184,41 +153,42 @@ def suggest_betting_on_next_race():
 
     x_race, y_race, odds_race = import_data.extract_x_y_odds(
         race_df=race_df,
+        source=SOURCE_PMU,
+        x_format="sequential_per_horse",
         y_format="first_position",
         ignore_y=True,
     )
-    n_horses = x_race.shape[0]
 
-    model = utils_model.create_model(n_horses=n_horses, y_format="probabilities")
-    y_hat_race = model.predict(x=np.expand_dims(x_race, axis=0))[0, :]
+    y_hat_race = winning_model.predict(x=np.expand_dims(x_race, axis=0))[0, :]
 
     expected_return_race = y_hat_race * odds_race * (1 - track_take)
 
     race_df["y_hat"] = y_hat_race
     race_df["expected_return"] = expected_return_race
 
-    bettings = wagering_stategy.race_betting_best_expected_return(
+    bettings = wagering_stategies.race_betting_best_expected_return(
         x_race=x_race,
         odds_race=odds_race,
         track_take=track_take,
         capital_fraction=capital_fraction,
+        winning_model=winning_model,
     )
 
     race_df["betting"] = bettings
 
-    df=race_df[
-            [
-                "horse_number",
-                "horse_name",
-                "y_hat",
-                "totalEnjeu",
-                "odds",
-                "expected_return",
-                "betting",
-            ]
-        ].set_index("horse_number")
+    df = race_df[
+        [
+            "horse_number",
+            "horse_name",
+            "y_hat",
+            "totalEnjeu",
+            "odds",
+            "expected_return",
+            "betting",
+        ]
+    ].set_index("horse_number")
 
-    print(tabulate(df, headers='keys', tablefmt='psql'))
+    print(tabulate(df, headers="keys", tablefmt="psql"))
     print()
 
 

@@ -3,7 +3,7 @@ from typing import Callable, Optional
 import numpy as np
 from scipy.stats import stats
 
-from winning_horse_models import AbstractWinningModel
+from winning_horse_models import AbstractWinningModel, ModelNotCreatedOnceError
 from winning_horse_models.baselines import RandomModel
 from utils import import_data
 
@@ -71,7 +71,7 @@ def compute_validation_error(
     validation_method: Callable,
     winning_model: AbstractWinningModel,
 ) -> dict:
-    assert k > 1
+    assert k > 0
 
     min_horse, max_horse = import_data.get_min_max_horse(source=source)
     res = {
@@ -103,8 +103,12 @@ def compute_validation_error(
         if x_race.size == 0:
             res["n_horses_validations"][n_horses] = {"n_val_races": 0}
             continue
+        try:
+            y_hat = winning_model.predict(x=x_race)
+        except ModelNotCreatedOnceError:
+            res["n_horses_validations"][n_horses] = {"message": "Model was not created"}
+            continue
 
-        y_hat = winning_model.predict(x=x_race)
         y_random = RandomModel().predict(x=x_race)
 
         rank_hat = np.apply_along_axis(

@@ -208,8 +208,9 @@ def get_dataset_races(
         rh_df = test_race_horse_df
 
     for race_id in rh_df["race_id"].unique():
+        race_df = rh_df[rh_df.race_id == race_id]
         x_race, y_race, odds_race = extract_x_y_odds(
-            race_df=rh_df[rh_df.race_id == race_id],
+            race_df=race_df,
             source=source,
             x_format=x_format,
             y_format=y_format,
@@ -218,7 +219,7 @@ def get_dataset_races(
             continue
         if remove_nan_odds and np.any(np.isnan(odds_race)):
             continue
-        yield x_race, y_race, odds_race
+        yield x_race, y_race, odds_race, race_df
 
 
 def get_min_max_horse(source: str) -> Tuple[int, int]:

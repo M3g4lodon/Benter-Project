@@ -83,11 +83,11 @@ def train_per_horse(
             loss_per_horse = (
                 metrics.log_loss(
                     y_true=_one_hot_encode(y, n_horses=n_horses),
-                    y_pred=model.predict_proba(X=x),
+                    y_pred=model.predict_proba(x),
                 )
                 / n_horses
             )
-            accuracy = metrics.accuracy_score(y_true=y, y_pred=model.predict(X=x))
+            accuracy = metrics.accuracy_score(y_true=y, y_pred=model.predict(x))
             if x_val.shape[0] < MIN_N_EXAMPLES:
                 val_loss_per_horse = np.nan
                 val_accuracy = np.nan
@@ -96,12 +96,12 @@ def train_per_horse(
                 val_loss_per_horse = (
                     metrics.log_loss(
                         y_true=_one_hot_encode(y_val, n_horses=n_horses),
-                        y_pred=model.predict_proba(X=x_val),
+                        y_pred=model.predict_proba(x_val),
                     )
                     / n_horses
                 )
                 val_accuracy = metrics.accuracy_score(
-                    y_true=y_val, y_pred=model.predict(X=x_val)
+                    y_true=y_val, y_pred=model.predict(x_val)
                 )
             training_history["n_horses_history"][n_horses].update(
                 {

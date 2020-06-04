@@ -13,6 +13,7 @@ from constants import PMU_DATA_DIR
 
 TIMEZONE = "Europe/Paris"
 # TODO scrape pronostics in real time (only available for few weeks)
+# TODO Handle ConnectionError error
 
 def execute_queries(seconds_before: int, race_times: dict) -> int:
     query_count = 0

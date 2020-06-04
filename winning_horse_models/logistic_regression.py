@@ -15,8 +15,9 @@ class LogisticRegressionModel(AbstractWinningModel):
 
     def __init__(self):
         self.shared_layer = tf.keras.layers.Dense(1, name="shared_layer")
+        self.n_horses_models = {}
 
-    def get_n_horses_model(self, n_horses: int):
+    def _create_n_horses_model(self, n_horses:int):
         inputs = tf.keras.Input(shape=(n_horses, N_FEATURES))
         unstacked = tf.keras.layers.Lambda(lambda x: tf.unstack(x, axis=1))(inputs)
         dense_outputs = [self.shared_layer(x) for x in unstacked]  # our shared layer
@@ -34,6 +35,12 @@ class LogisticRegressionModel(AbstractWinningModel):
         )
         model.build(input_shape=(None, n_horses, N_FEATURES))
         return model
+
+    def get_n_horses_model(self, n_horses: int):
+        if n_horses not in self.n_horses_models:
+            self.n_horses_models[n_horses] = self._create_n_horses_model(n_horses=n_horses)
+
+        return self.n_horses_models[n_horses]
 
     def predict(self, x: np.array):
         model = self.get_n_horses_model(n_horses=x.shape[1])
@@ -66,6 +73,7 @@ class LogisticRegressionModel(AbstractWinningModel):
         )
         shared_layer.build(input_shape=(N_FEATURES,))
         shared_layer.set_weights(baseline_weights)
+
         model = LogisticRegressionModel()
         model.shared_layer = shared_layer
         return model

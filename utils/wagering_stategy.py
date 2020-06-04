@@ -31,6 +31,7 @@ def compute_expected_return(
         1
     ]
     records = []
+    n_races = import_data.get_n_races(source=source, on_split="val")
     for x_race, y_race, odds_race, race_df in tqdm(
         import_data.get_dataset_races(
             source=source,
@@ -40,6 +41,7 @@ def compute_expected_return(
             remove_nan_odds=True,
         ),
         leave=False,
+        total=n_races,
     ):
         betting_race = compute_betting(
             x_race=x_race,
@@ -55,7 +57,7 @@ def compute_expected_return(
         actual_betting = np.round(betting_race, decimals=2)
         expected_return = np.where(
             y_race == 1,
-            actual_betting * odds_race * (1 - track_take), # TODO feedback effect
+            actual_betting * odds_race * (1 - track_take),  # TODO feedback effect
             np.zeros_like(actual_betting),
         ).sum() - np.sum(actual_betting)
         records.append(
@@ -63,9 +65,8 @@ def compute_expected_return(
                 "sum_betting": actual_betting.sum(),
                 "expected_return": expected_return,
                 "n_horse": x_race.shape[0],
-                "date": race_df['date'][0],
-                "race_id":race_df['race_id'][0]
-
+                "date": race_df["date"].iloc[0],
+                "race_id": race_df["race_id"].iloc[0],
             }
         )
 
@@ -78,7 +79,7 @@ def compute_scenario(
     code_pari: str,
     capital_fraction: float,
     winning_model: AbstractWinningModel,
-    show: bool = False,
+    verbose: bool = False,
 ) -> pd.DataFrame:
     """Return scenario on validation dataset"""
     track_take = [betting for betting in PMU_BETTINGS if betting.name == code_pari][0][
@@ -87,6 +88,7 @@ def compute_scenario(
     np.random.seed(42)
     capital_value = initial_capital
     records = []
+    n_races = import_data.get_n_races(source=source, on_split="val")
     for x_race, y_race, odds_race, race_df in tqdm(
         import_data.get_dataset_races(
             source=source,
@@ -96,6 +98,7 @@ def compute_scenario(
             remove_nan_odds=True,
         ),
         leave=False,
+        total=n_races,
     ):
         betting_race = compute_betting_fun(
             x_race=x_race,
@@ -122,13 +125,16 @@ def compute_scenario(
                 "Capital": capital_value,
                 "Relative Return": (capital_value - capital_value_old)
                 / capital_value_old,
+                "n_horse": x_race.shape[0],
+                "date": race_df["date"].iloc[0],
+                "race_id": race_df["race_id"].iloc[0],
             }
         )
 
     data = pd.DataFrame.from_records(records)
 
     data["#_races"] = data.index.to_series()
-    if show:
+    if verbose:
         ax = sns.lineplot(data=data, x="#_races", y="Capital",)
         ax.set(yscale="log")
         plt.show()
@@ -155,14 +161,14 @@ def compute_scenario(
 def run():
     from winning_horse_models.baselines import RandomModel
 
-
     compute_scenario(
         compute_betting_fun=race_betting_proportional_positive_return,
         source="PMU",
         code_pari="E_SIMPLE_GAGNANT",
         capital_fraction=0.01,
-        winning_model=RandomModel()
+        winning_model=RandomModel(),
     )
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     run()

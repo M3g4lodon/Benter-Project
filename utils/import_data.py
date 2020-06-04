@@ -75,7 +75,23 @@ def get_splitted_featured_data(
         val_race_horse_df
     ) + len(test_race_horse_df)
 
-    return (train_race_horse_df, val_race_horse_df, test_race_horse_df)
+    return train_race_horse_df, val_race_horse_df, test_race_horse_df
+
+
+def get_split_date(source: str, on_split: str) -> pd.DataFrame:
+    (
+        train_race_horse_df,
+        val_race_horse_df,
+        test_race_horse_df,
+    ) = get_splitted_featured_data(source)
+    assert on_split in {"train", "val", "test"}
+
+    if on_split == "train":
+        return train_race_horse_df
+    elif on_split == "val":
+        return val_race_horse_df
+    else:
+        return test_race_horse_df
 
 
 def extract_x_y_odds(
@@ -146,27 +162,13 @@ def get_races_per_horse_number(
 ) -> Tuple[np.array, np.array, np.array]:
     """For the given source, the given split, the given number of horses per races, the given y_format,
     returns numpy arrays of features, y, and odds"""
-    assert on_split in {"train", "val", "test"}
 
-    (
-        train_race_horse_df,
-        val_race_horse_df,
-        test_race_horse_df,
-    ) = get_splitted_featured_data(source=source)
-    if on_split == "train":
-        rh_df = train_race_horse_df
-    elif on_split == "val":
-        rh_df = val_race_horse_df
-    else:
-        rh_df = test_race_horse_df
-    n_horse_per_race = rh_df.groupby("race_id")["n_horses"].first()
-    n_horse_per_race_id = n_horse_per_race[n_horse_per_race == n_horses].index
+    rh_df = get_split_date(source=source, on_split=on_split)
 
     x = []
     y = []
     odds = []
-    for race_id in n_horse_per_race_id:
-        race_df = rh_df[rh_df.race_id == race_id]
+    for race_id, race_df in rh_df[rh_df["n_horses"] == n_horses].groupby("race_id"):
         if source == "PMU":
             race_df = race_df[race_df["statut"] == "PARTANT"]
         assert len(race_df) == n_horses
@@ -195,25 +197,11 @@ def get_dataset_races(
     remove_nan_odds: bool = False,
 ):
     """For the given data source, the given split, the given y_format, yield every races (features, y, odds)"""
-    (
-        train_race_horse_df,
-        val_race_horse_df,
-        test_race_horse_df,
-    ) = get_splitted_featured_data(source=source)
-    if on_split == "train":
-        rh_df = train_race_horse_df
-    elif on_split == "val":
-        rh_df = val_race_horse_df
-    else:
-        rh_df = test_race_horse_df
+    rh_df = get_split_date(source=source, on_split=on_split)
 
-    for race_id in rh_df["race_id"].unique():
-        race_df = rh_df[rh_df.race_id == race_id]
+    for race_id, race_df in rh_df.groupby("race_id"):
         x_race, y_race, odds_race = extract_x_y_odds(
-            race_df=race_df,
-            source=source,
-            x_format=x_format,
-            y_format=y_format,
+            race_df=race_df, source=source, x_format=x_format, y_format=y_format,
         )
         if any([x_race is None, y_race is None, odds_race is None]):
             continue
@@ -228,6 +216,11 @@ def get_min_max_horse(source: str) -> Tuple[int, int]:
     max_n_horses = count_per_n_horses.max()
     min_n_horses = max(2, count_per_n_horses.min())
     return min_n_horses, max_n_horses
+
+
+def get_n_races(source: str, on_split: str) -> int:
+    rh_df = get_split_date(source=source, on_split=on_split)
+    return rh_df["race_id"].nunique()
 
 
 def run():

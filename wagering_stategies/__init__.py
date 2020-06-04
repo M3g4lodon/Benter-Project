@@ -13,10 +13,8 @@ def race_betting_proportional_positive_return(
     capital_fraction: float,
 ) -> np.array:
     """Returns bettings proportional to computed positive returns"""
-    n_horses = x_race.shape[0]
 
-    model = winning_model.get_n_horses_model(n_horses=n_horses)
-    y_hat_race = model.predict(x=np.expand_dims(x_race, axis=0))[0, :]
+    y_hat_race = winning_model.predict(x=np.expand_dims(x_race, axis=0))[0, :]
 
     expected_return_race = y_hat_race * odds_race * (1 - track_take)
     positives_returns = np.where(
@@ -41,8 +39,7 @@ def race_betting_best_expected_return(
     """Returns bettings putting all capital fraction on the best expected return (if it is positive)"""
     n_horses = x_race.shape[0]
 
-    model = winning_model.get_n_horses_model(n_horses=n_horses)
-    y_hat_race = model.predict(x=np.expand_dims(x_race, axis=0))[0, :]
+    y_hat_race = winning_model.predict(x=np.expand_dims(x_race, axis=0))[0, :]
 
     expected_return_race = y_hat_race * odds_race * (1 - track_take)
     if expected_return_race.max() <= 1.0:
@@ -69,10 +66,8 @@ def race_bettings_kelly(
     """Returns Kelly criterion to compute optimal betting
     (capital_fraction can be omitted here since Kelly criterion already computes the
      optimal capital fraction to risk)"""
-    n_horses = x_race.shape[0]
 
-    model = winning_model.get_n_horses_model(n_horses=n_horses)
-    y_hat_race = model.predict(x=np.expand_dims(x_race, axis=0))[0, :]
+    y_hat_race = winning_model.predict(x=np.expand_dims(x_race, axis=0))[0, :]
 
     expected_return_race = y_hat_race * odds_race * (1 - track_take)
 
@@ -108,9 +103,7 @@ def race_betting_proportional_winning_proba(
     capital_fraction: float,
 ) -> np.array:
     """Returns bettings proportional to winning proba given by winning_model"""
-    n_horses = x_race.shape[0]
-    model = winning_model.get_n_horses_model(n_horses=n_horses)
-    y_hat_race = model.predict(x=np.expand_dims(x_race, axis=0))[0, :]
+    y_hat_race = winning_model.predict(x=np.expand_dims(x_race, axis=0))[0, :]
     assert np.isclose(y_hat_race.sum(), 1.0)
     betting = y_hat_race * capital_fraction
 
@@ -119,15 +112,13 @@ def race_betting_proportional_winning_proba(
 
 def race_betting_best_winning_proba(
     x_race: np.array,
-    odds_rac: np.array,
+    odds_race: np.array,
     track_take: float,
     winning_model: AbstractWinningModel,
     capital_fraction: float,
 ) -> np.array:
     """Returns bettings with all capital_fraction on the best horse according to winning_model"""
-    n_horses = x_race.shape[0]
-    model = winning_model.get_n_horses_model(n_horses=n_horses)
-    y_hat_race = model.predict(x=np.expand_dims(x_race, axis=0))[0, :]
+    y_hat_race = winning_model.predict(x=np.expand_dims(x_race, axis=0))[0, :]
     assert np.isclose(y_hat_race.sum(), 1.0)
     betting = y_hat_race == y_hat_race.max()
     betting = betting / np.sum(betting)

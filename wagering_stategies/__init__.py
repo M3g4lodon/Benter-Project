@@ -42,12 +42,9 @@ def race_betting_best_expected_return(
     y_hat_race = winning_model.predict(x=np.expand_dims(x_race, axis=0))[0, :]
 
     expected_return_race = y_hat_race * odds_race * (1 - track_take)
-    if expected_return_race.max() <= 1.0:
-        return np.zeros((n_horses,))
     max_expected_return = expected_return_race.max()
-
-    if max_expected_return <= 0:
-        return np.zeros_like(y_hat_race)
+    if max_expected_return <= 1.0:
+        return np.zeros((n_horses,))
 
     betting = expected_return_race == max_expected_return
     assert betting.sum()
@@ -121,6 +118,22 @@ def race_betting_best_winning_proba(
     y_hat_race = winning_model.predict(x=np.expand_dims(x_race, axis=0))[0, :]
     assert np.isclose(y_hat_race.sum(), 1.0)
     betting = y_hat_race == y_hat_race.max()
+    betting = betting / np.sum(betting)
+    betting = betting * capital_fraction
+    return betting
+
+def race_betting_best_winning_proba_not_max_pari_mutual_proba(x_race: np.array,
+    odds_race: np.array,
+    track_take: float,
+    winning_model: AbstractWinningModel,
+    capital_fraction: float,
+) -> np.array:
+    """Returns the best winning proba horse that is not the horse with the most bets on"""
+    y_hat_race = winning_model.predict(x=np.expand_dims(x_race, axis=0))[0, :]
+    assert np.isclose(y_hat_race.sum(), 1.0)
+    betting = np.logical_and(y_hat_race == y_hat_race.max(), odds_race != odds_race.min())
+    if np.sum(betting)==0:
+        betting = y_hat_race == np.sort(y_hat_race)[-2]
     betting = betting / np.sum(betting)
     betting = betting * capital_fraction
     return betting

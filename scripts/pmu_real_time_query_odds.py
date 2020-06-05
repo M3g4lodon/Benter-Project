@@ -6,6 +6,7 @@ from cachetools import func
 import pytz
 
 from scripts.scrape_pmu_data import get_pmu_api_url
+from requests.exceptions import ConnectionError
 from utils.scrape import execute_get_query, create_day_folder
 
 import utils
@@ -14,6 +15,7 @@ from constants import PMU_DATA_DIR
 TIMEZONE = "Europe/Paris"
 # TODO scrape pronostics in real time (only available for few weeks)
 # TODO Handle ConnectionError error
+
 
 def execute_queries(seconds_before: int, race_times: dict) -> int:
     query_count = 0
@@ -105,9 +107,18 @@ def run():
     print("Query Odds before races from pmu.fr/turf")
 
     query_count = 0
+    retry_count = 0
     while True:
         start_date = dt.datetime.now()
-        new_queries = update()
+        new_queries = None
+        try:
+            new_queries = update()
+        except ConnectionError as e:
+            retry_count += 1
+            print(
+                f"\r[{start_date.isoformat()}] Connection Error n° {retry_count}: {e}",
+                end="",
+            )
         end_date = dt.datetime.now()
         if new_queries:
             print(

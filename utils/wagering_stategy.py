@@ -79,7 +79,6 @@ def compute_scenario(
     code_pari: str,
     capital_fraction: float,
     winning_model: AbstractWinningModel,
-    verbose: bool = False,
 ) -> pd.DataFrame:
     """Return scenario on validation dataset"""
     track_take = [betting for betting in PMU_BETTINGS if betting.name == code_pari][0][
@@ -131,31 +130,30 @@ def compute_scenario(
             }
         )
 
-    data = pd.DataFrame.from_records(records)
+    return pd.DataFrame.from_records(records)
 
-    data["#_races"] = data.index.to_series()
-    if verbose:
-        ax = sns.lineplot(data=data, x="#_races", y="Capital",)
-        ax.set(yscale="log")
-        plt.show()
 
-        exp_growth_rate = np.log(
-            data["Capital"].iloc[-1] / data["Capital"].iloc[0]
-        ) / len(data)
+def plot_scenario(scenario_df:pd.DataFrame):
+    ax = sns.lineplot(data=scenario_df, x="#_races", y="Capital", )
+    ax.set(yscale="log")
+    plt.show()
+
+    exp_growth_rate = np.log(
+        scenario_df["Capital"].iloc[-1] / scenario_df["Capital"].iloc[0]
+    ) / len(scenario_df)
+    print(
+        f"End capital: {scenario_df['Capital'].iloc[-1]:.2f}, exponential growth rate: {exp_growth_rate:.2%}"
+    )
+    sns.distplot(scenario_df["Relative Return"])
+    plt.show()
+
+    if (scenario_df["Capital"] == 0).any():
+        zero_capital_index = scenario_df[scenario_df["Capital"] == 0]["#_races"].iloc[0]
         print(
-            f"End capital: {data['Capital'].iloc[-1]:.2f}, exponential growth rate: {exp_growth_rate:.2%}"
+            f"No more capital after race n°{zero_capital_index + 1} (index {zero_capital_index})"
         )
-        sns.distplot(data["Relative Return"])
-        plt.show()
-
-        if (data["Capital"] == 0).any():
-            zero_capital_index = data[data["Capital"] == 0]["#_races"].iloc[0]
-            print(
-                f"No more capital after race n°{zero_capital_index + 1} (index {zero_capital_index})"
-            )
-        else:
-            print("Capital is never null!")
-    return data
+    else:
+        print("Capital is never null!")
 
 
 def run():

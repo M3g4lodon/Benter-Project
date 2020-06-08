@@ -6,12 +6,13 @@ import pandas as pd
 import seaborn as sns
 from tqdm import tqdm
 
-from constants import PMU_BETTINGS
+from constants import PMU_BETTINGS, PMU_MINIMUM_BET_SIZE
+from utils.expected_return import get_race_odds
 from wagering_stategies import race_betting_proportional_positive_return
 from winning_horse_models import AbstractWinningModel
 from utils import import_data
 
-initial_capital = 100
+initial_capital = 100 * 100  # 100.00€
 
 # TODO add more stat (max drawdown, look at master thesis, max number of losses, expexted return, return distribution,
 #  standard deviation of returns, EDA on returns to find bias, expected winning proba, average length of loss streak...)
@@ -31,33 +32,38 @@ def compute_expected_return(
         1
     ]
     records = []
-    n_races = import_data.get_n_races(source=source, on_split="val")
-    for x_race, y_race, odds_race, race_df in tqdm(
+    n_races = import_data.get_n_races(source=source, on_split="val", remove_nan_previous_stakes=True)
+    for x_race, y_race, race_df in tqdm(
         import_data.get_dataset_races(
             source=source,
             on_split="val",
             y_format="rank",
             x_format="sequential_per_horse",
-            remove_nan_odds=True,
+            remove_nan_previous_stakes=True,
         ),
         leave=False,
         total=n_races,
     ):
         betting_race = compute_betting(
             x_race=x_race,
-            odds_race=odds_race,
+            previous_stakes=race_df["totalEnjeu"],
             winning_model=winning_model,
             track_take=track_take,
             capital_fraction=1.0,
+
         )
 
-        assert 0 <= np.sum(betting_race)
+        assert 0 <= np.sum(betting_race) or np.isclose(np.sum(betting_race), 0.0)
         assert np.sum(betting_race) <= 1 or np.isclose(np.sum(betting_race), 1.0)
 
         actual_betting = np.round(betting_race, decimals=2)
         expected_return = np.where(
             y_race == 1,
-            actual_betting * odds_race * (1 - track_take),  # TODO feedback effect
+            get_race_odds(
+                track_take=track_take,
+                previous_stakes=race_df["totalEnjeu"],
+                race_bet=actual_betting,
+            ),
             np.zeros_like(actual_betting),
         ).sum() - np.sum(actual_betting)
         records.append(
@@ -87,26 +93,29 @@ def compute_scenario(
     np.random.seed(42)
     capital_value = initial_capital
     records = []
-    n_races = import_data.get_n_races(source=source, on_split="val")
-    for x_race, y_race, odds_race, race_df in tqdm(
+    n_races = import_data.get_n_races(source=source, on_split="val", remove_nan_previous_stakes=True)
+    for x_race, y_race, race_df in tqdm(
         import_data.get_dataset_races(
             source=source,
             on_split="val",
             y_format="rank",
             x_format="sequential_per_horse",
-            remove_nan_odds=True,
+            remove_nan_previous_stakes=True,
         ),
         leave=False,
         total=n_races,
     ):
         betting_race = compute_betting_fun(
             x_race=x_race,
-            odds_race=odds_race,
+            previous_stakes=race_df["totalEnjeu"],
             track_take=track_take,
             winning_model=winning_model,
             capital_fraction=capital_fraction,
         )
-        assert 0 <= np.sum(betting_race)
+        assert 0 <= np.sum(betting_race) or np.isclose(np.sum(betting_race), 0.0), (
+            f"{betting_race} sum {np.sum(betting_race)} can not be below 0.0, "
+            f"on race id {race_df['id'].iloc[0]}"
+        )
         assert np.sum(betting_race) <= 1 or np.isclose(np.sum(betting_race), 1.0)
 
         actual_betting = np.round(betting_race * capital_value, decimals=2)
@@ -114,7 +123,11 @@ def compute_scenario(
         capital_value_old = capital_value
         capital_value += np.where(
             y_race == 1,
-            actual_betting * odds_race * (1 - track_take),  # TODO Feedback effect
+            get_race_odds(
+                track_take=track_take,
+                previous_stakes=race_df["totalEnjeu"],
+                race_bet=actual_betting,
+            ),
             np.zeros_like(actual_betting),
         ).sum() - np.sum(actual_betting)
 
@@ -133,8 +146,8 @@ def compute_scenario(
     return pd.DataFrame.from_records(records)
 
 
-def plot_scenario(scenario_df:pd.DataFrame):
-    ax = sns.lineplot(data=scenario_df, x="#_races", y="Capital", )
+def plot_scenario(scenario_df: pd.DataFrame):
+    ax = sns.lineplot(data=scenario_df, x="#_races", y="Capital",)
     ax.set(yscale="log")
     plt.show()
 

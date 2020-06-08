@@ -105,5 +105,7 @@ PMU_BETTINGS = [
     Betting("e_super_4", 0.1675),
 ]
 
+PMU_MINIMUM_BET_SIZE = 150  # 1.50€
+
 # Unibet
 UNIBET_MIN_DATE = dt.date(2005, 6, 18)

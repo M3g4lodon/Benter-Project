@@ -2,7 +2,7 @@ import datetime as dt
 import functools
 import os
 from itertools import combinations
-from typing import Tuple, Optional, Union
+from typing import Tuple, Optional, Union, Iterator
 import pytz
 
 import numpy as np
@@ -100,10 +100,8 @@ def extract_x_y_odds(
     y_format: str,
     source: str,
     ignore_y: bool = False,
-) -> Tuple[
-    Optional[pd.DataFrame], Optional[Union[np.array, np.float]], Optional[np.array]
-]:
-    """For a given race in `race_df` return features, y in the asked format"""
+) -> Tuple[Optional[np.array], Optional[np.array], Optional[np.array]]:
+    """For a given race in `race_df` returns features, y in the asked format and odds"""
     assert x_format in {"sequential_per_horse", "flattened"}
     assert y_format in {"first_position", "rank", "index_first"}
     from utils import preprocess
@@ -194,20 +192,21 @@ def get_dataset_races(
     on_split: str,
     x_format: str,
     y_format: str,
-    remove_nan_odds: bool = False,
-):
-    """For the given data source, the given split, the given y_format, yield every races (features, y, odds)"""
+    remove_nan_previous_stakes: bool = False,
+) -> Iterator[Tuple[np.array, np.array, pd.DataFrame]]:
+    """For the given data source, the given split, the given y_format,
+    yields every races (features, y, race dataframe)"""
     rh_df = get_split_date(source=source, on_split=on_split)
 
     for race_id, race_df in rh_df.groupby("race_id"):
-        x_race, y_race, odds_race = extract_x_y_odds(
+        x_race, y_race, _ = extract_x_y_odds(
             race_df=race_df, source=source, x_format=x_format, y_format=y_format,
         )
-        if any([x_race is None, y_race is None, odds_race is None]):
+        if any([x_race is None, y_race is None]):
             continue
-        if remove_nan_odds and np.any(np.isnan(odds_race)):
+        if np.any(np.isnan(race_df["totalEnjeu"])) and remove_nan_previous_stakes:
             continue
-        yield x_race, y_race, odds_race, race_df
+        yield x_race, y_race, race_df
 
 
 def get_min_max_horse(source: str) -> Tuple[int, int]:
@@ -218,8 +217,17 @@ def get_min_max_horse(source: str) -> Tuple[int, int]:
     return min_n_horses, max_n_horses
 
 
-def get_n_races(source: str, on_split: str) -> int:
+def get_n_races(
+    source: str, on_split: str, remove_nan_previous_stakes: bool = False
+) -> int:
+    # TODO add remove total enjeu nan
     rh_df = get_split_date(source=source, on_split=on_split)
+    if remove_nan_previous_stakes:
+        return (
+            rh_df.groupby("race_id")["totalEnjeu"]
+            .agg(lambda s: np.logical_not(np.any(np.isnan(s))))
+            .sum()
+        )
     return rh_df["race_id"].nunique()
 
 

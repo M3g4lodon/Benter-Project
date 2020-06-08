@@ -560,9 +560,7 @@ def convert_queried_data_to_race_horse_df(
     )
 
     # Compute odds and pari_mutuel_proba
-    race_horse_df["totalEnjeu"] = (
-        race_horse_df["totalEnjeu"] / 100
-    )  # to have the result in plain euro and not in cents
+    race_horse_df["totalEnjeu"] = race_horse_df["totalEnjeu"]  # in cents
     sum_per_race = race_horse_df.groupby("race_id")["totalEnjeu"].sum()
 
     race_horse_df["pari_mutuel_proba"] = race_horse_df["totalEnjeu"] / race_horse_df[

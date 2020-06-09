@@ -209,6 +209,7 @@ def get_dataset_races(
         yield x_race, y_race, race_df
 
 
+@memory.cache
 def get_min_max_horse(source: str) -> Tuple[int, int]:
     race_horse_df = load_featured_data(source=source)
     count_per_n_horses = race_horse_df.groupby("race_id")["horse_id"].count()
@@ -217,10 +218,10 @@ def get_min_max_horse(source: str) -> Tuple[int, int]:
     return min_n_horses, max_n_horses
 
 
+@memory.cache
 def get_n_races(
     source: str, on_split: str, remove_nan_previous_stakes: bool = False
 ) -> int:
-    # TODO add remove total enjeu nan
     rh_df = get_split_date(source=source, on_split=on_split)
     if remove_nan_previous_stakes:
         return (

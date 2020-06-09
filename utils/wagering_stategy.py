@@ -6,7 +6,7 @@ import pandas as pd
 import seaborn as sns
 from tqdm import tqdm
 
-from constants import PMU_BETTINGS, PMU_MINIMUM_BET_SIZE
+from constants import PMU_BETTINGS
 from utils.expected_return import get_race_odds
 from wagering_stategies import race_betting_proportional_positive_return
 from winning_horse_models import AbstractWinningModel
@@ -57,7 +57,7 @@ def compute_expected_return(
         assert 0 <= np.sum(betting_race) or np.isclose(np.sum(betting_race), 0.0)
         assert np.sum(betting_race) <= 1 or np.isclose(np.sum(betting_race), 1.0)
 
-        actual_betting = np.round(betting_race, decimals=2)
+        actual_betting = np.round(betting_race)
         expected_return = np.where(
             y_race == 1,
             get_race_odds(
@@ -121,7 +121,7 @@ def compute_scenario(
         )
         assert np.sum(betting_race) <= 1 or np.isclose(np.sum(betting_race), 1.0)
 
-        actual_betting = np.round(betting_race * capital_value, decimals=2)
+        actual_betting = np.round(betting_race * capital_value)
 
         capital_value_old = capital_value
         capital_value += np.where(

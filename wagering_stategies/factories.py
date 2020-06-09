@@ -22,11 +22,14 @@ def _betting_on_best_expected_return_thresholded_expected_return(
 
     y_hat_race = winning_model.predict(x=np.expand_dims(x_race, axis=0))[0, :]
 
-    expected_return_race = get_race_expected_return(
-        y_hat_race=y_hat_race,
-        track_take=track_take,
-        previous_stakes=previous_stakes,
-        race_bet=PMU_MINIMUM_BET_SIZE * np.ones((n_horses,)),
+    expected_return_race = (
+        get_race_expected_return(
+            y_hat_race=y_hat_race,
+            track_take=track_take,
+            previous_stakes=previous_stakes,
+            race_bet=PMU_MINIMUM_BET_SIZE * np.ones((n_horses,)),
+        )
+        / PMU_MINIMUM_BET_SIZE
     )
     if expected_return_race.max() <= 1.0:
         return np.zeros((n_horses,))
@@ -69,14 +72,17 @@ def _betting_on_best_expected_return_thresholded_winning_probabilities(
         y_hat_race > _minimum_winning_probabilities, y_hat_race, np.zeros((n_horses,))
     )
 
-    expected_return_race = get_race_expected_return(
-        y_hat_race=y_hat_race,
-        track_take=track_take,
-        previous_stakes=previous_stakes,
-        race_bet=PMU_MINIMUM_BET_SIZE * np.ones((n_horses,)),
+    expected_return_race = (
+        get_race_expected_return(
+            y_hat_race=y_hat_race,
+            track_take=track_take,
+            previous_stakes=previous_stakes,
+            race_bet=PMU_MINIMUM_BET_SIZE * np.ones((n_horses,)),
+        )
+        / PMU_MINIMUM_BET_SIZE
     )
     max_expected_return = expected_return_race.max()
-    if max_expected_return <= 1.0:
+    if max_expected_return <= 0.0:
         return np.zeros((n_horses,))
 
     betting = expected_return_race == max_expected_return
@@ -113,14 +119,15 @@ def _betting_on_best_expected_return_thresholded_winning_probabilities_expected_
         y_hat_race > _minimum_winning_probabilities, y_hat_race, np.zeros((n_horses,))
     )
 
-    expected_return_race = get_race_expected_return(
-        y_hat_race=y_hat_race,
-        track_take=track_take,
-        previous_stakes=previous_stakes,
-        race_bet=PMU_MINIMUM_BET_SIZE * np.ones((n_horses,)),
+    expected_return_race = (
+        get_race_expected_return(
+            y_hat_race=y_hat_race,
+            track_take=track_take,
+            previous_stakes=previous_stakes,
+            race_bet=PMU_MINIMUM_BET_SIZE * np.ones((n_horses,)),
+        )
+        / PMU_MINIMUM_BET_SIZE
     )
-    if expected_return_race.max() <= 1.0:
-        return np.zeros((n_horses,))
     max_expected_return = expected_return_race.max()
 
     if max_expected_return <= _expected_return_threshold:

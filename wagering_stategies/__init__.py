@@ -19,11 +19,14 @@ def race_betting_proportional_positive_return(
 
     y_hat_race = winning_model.predict(x=np.expand_dims(x_race, axis=0))[0, :]
 
-    expected_return_race = get_race_expected_return(
-        y_hat_race=y_hat_race,
-        track_take=track_take,
-        previous_stakes=previous_stakes,
-        race_bet=PMU_MINIMUM_BET_SIZE * np.ones((n_horses,)),
+    expected_return_race = (
+        get_race_expected_return(
+            y_hat_race=y_hat_race,
+            track_take=track_take,
+            previous_stakes=previous_stakes,
+            race_bet=PMU_MINIMUM_BET_SIZE * np.ones((n_horses,)),
+        )
+        / PMU_MINIMUM_BET_SIZE
     )
     positives_returns = np.where(
         expected_return_race > 1,
@@ -49,14 +52,17 @@ def race_betting_best_expected_return(
 
     y_hat_race = winning_model.predict(x=np.expand_dims(x_race, axis=0))[0, :]
 
-    expected_return_race = get_race_expected_return(
-        y_hat_race=y_hat_race,
-        track_take=track_take,
-        previous_stakes=previous_stakes,
-        race_bet=PMU_MINIMUM_BET_SIZE * np.ones((n_horses,)),
+    expected_return_race = (
+        get_race_expected_return(
+            y_hat_race=y_hat_race,
+            track_take=track_take,
+            previous_stakes=previous_stakes,
+            race_bet=PMU_MINIMUM_BET_SIZE * np.ones((n_horses,)),
+        )
+        / PMU_MINIMUM_BET_SIZE
     )
     max_expected_return = expected_return_race.max()
-    if max_expected_return <= 1.0:
+    if max_expected_return <= 0.0:
         return np.zeros((n_horses,))
 
     betting = expected_return_race == max_expected_return
@@ -85,7 +91,9 @@ def race_bettings_kelly(
     odds_race = np.where(
         previous_stakes > 0,
         previous_stakes.sum() / previous_stakes,
-        (previous_stakes.sum() + PMU_MINIMUM_BET_SIZE) / PMU_MINIMUM_BET_SIZE * np.ones_like(previous_stakes),
+        (previous_stakes.sum() + PMU_MINIMUM_BET_SIZE)
+        / PMU_MINIMUM_BET_SIZE
+        * np.ones_like(previous_stakes),
     )
     expected_return_race = y_hat_race * odds_race * (1 - track_take)
 
@@ -107,9 +115,6 @@ def race_bettings_kelly(
     race_f = np.clip(
         (expected_return_race - R_S) / (1 - track_take) / odds_race, a_min=0, a_max=None
     )
-    if capital_fraction:
-        if race_f.sum():
-            race_f = race_f * capital_fraction / np.sum(race_f)
     return race_f
 
 

@@ -12,8 +12,9 @@ Inspired by this Bloomberg [article ](https://www.bloomberg.com/news/features/20
 ### State of the project
 | Area              | current state         |WIP            |
 | ------------------| :--------------------:|--------------:|
-|Website scraped    |PMU Unibet             |               |
+|Scraped Website    |PMU Unibet(stoped)     |               |
 |Betting type       |Simple_gagnant         | Simple_place  |
-|Winning Proba Model|logistic regression SGD, baselines|skleanrn, MLP,|
-|Wagering strategy  |Kelly,Most Expected return, baselines| |
+|Training           | train on n_horses     | train on all races, permutations on races|
+|Winning Proba Model|logistic regression SGD, baselines, skleanrn, MLP|transformer|
+|Wagering strategy  |Kelly,Most Expected return, baselines, factories| |
 

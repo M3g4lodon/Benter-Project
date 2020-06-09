@@ -1,6 +1,6 @@
 # Benter Project
 
-Inspired by this Bloomberg [article ](https://www.bloomberg.com/news/features/2018-05-03/the-gambler-who-cracked-the-horse-racing-code)
+Inspired by this Bloomberg [article](https://www.bloomberg.com/news/features/2018-05-03/the-gambler-who-cracked-the-horse-racing-code)
 
 ### Similar projects:
 - [pourquoi/cataclop](https://github.com/pourquoi/cataclop/tree/master/cataclop)
@@ -12,9 +12,10 @@ Inspired by this Bloomberg [article ](https://www.bloomberg.com/news/features/20
 ### State of the project
 | Area              | current state         |WIP            |
 | ------------------| :--------------------:|--------------:|
-|Scraped Website    |PMU Unibet(stoped)     |               |
+|Scraped Website    |PMU Unibet(stopped)    |               |
 |Betting type       |Simple_gagnant         | Simple_place  |
 |Training           | train on n_horses     | train on all races, permutations on races|
-|Winning Proba Model|logistic regression SGD, baselines, skleanrn, MLP|transformer|
+|Winning Horse Model|logistic regression SGD, baselines, skleanrn,|sequential MLP, MLP, transformer, dimension reduction technique|
 |Wagering strategy  |Kelly,Most Expected return, baselines, factories| |
+|Real time betting  |Real time suggestion   |Real time betting directly on PMU |
 

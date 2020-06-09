@@ -1,69 +1,17 @@
 import datetime as dt
 import os
-from typing import Optional, Union
 
 from tqdm import tqdm
 
 import utils
-from constants import PMU_DATA_DIR, PMU_MIN_DATE
+from constants import PMU_MIN_DATE, SOURCE_PMU
+from utils.pmu_api_data import get_pmu_api_url
 from utils.scrape import execute_get_query, create_day_folder, check_query_json
-
-
-def get_pmu_api_url(
-    url_name: str,
-    date: Union[dt.datetime, dt.date],
-    r_i: Optional[int] = None,
-    c_i: Optional[int] = None,
-    code_pari: Optional[str] = None,
-) -> str:
-    pmu_programme_api_url = f"https://online.turfinfo.api.pmu.fr/rest/client/1/programme/{date.strftime('%d%m%Y')}"
-    if url_name == "PROGRAMME":
-        return pmu_programme_api_url
-
-    assert r_i is not None
-    assert c_i is not None
-
-    assert r_i > 0
-    assert c_i > 0
-
-    _pmu_programme_course_api_url = f"{pmu_programme_api_url}/R{r_i}/C{c_i}"
-
-    if url_name == "PARTICIPANTS":
-        return f"{_pmu_programme_course_api_url}/participants"
-    elif url_name == "PRONOSTIC":
-        return f"{_pmu_programme_course_api_url}/pronostics"
-    elif url_name == "PRONOSTIC_DETAILLE":
-        return f"{_pmu_programme_course_api_url}/pronostics-detailles"
-    elif url_name == "PERFORMANCE":
-        return f"{_pmu_programme_course_api_url}/performances-detaillees/pretty"
-    elif url_name == "ENJEU":
-        return f"{_pmu_programme_course_api_url}/masse-enjeu-v2"
-    elif url_name == "ENJEU_INTERNET":
-        return f"{_pmu_programme_course_api_url}/masse-enjeu-v2?specialisation=INTERNET"
-    elif url_name == "CITATIONS":
-        return f"{_pmu_programme_course_api_url}/citations"
-    elif url_name == "RAPPORTS_DEF":
-        return f"{_pmu_programme_course_api_url}/rapports-definitifs"
-    elif url_name == "RAPPORTS_DEF_INTERNET":
-        return f"{_pmu_programme_course_api_url}/rapports-definitifs?specialisation=INTERNET"
-    elif url_name == "COMBINAISONS":
-        return f"{_pmu_programme_course_api_url}/combinaisons"
-    elif url_name == "COMBINAISONS_INTERNET":
-        return f"{_pmu_programme_course_api_url}/combinaisons?specialisation=INTERNET"
-    elif url_name == "CITATIONS_INTERNET":
-        return f"{_pmu_programme_course_api_url}/citations?specialisation=INTERNET"
-    # TODO compare w/ or w/o specialisation on combinaisons, look at E_SIMPLE_GAGNANT vs SIMPLE_GAGNANT
-
-    assert code_pari is not None
-
-    PMU_RAPPORTS_API_URL = f"{_pmu_programme_course_api_url}/rapports/{code_pari}"
-    assert url_name == "RAPPORTS"
-    return PMU_RAPPORTS_API_URL
 
 
 def download_day_races(date: dt.date, replace_if_exists: bool = True) -> int:
     query_count = 0
-    day_folder_path = os.path.join(PMU_DATA_DIR, date.isoformat())
+    day_folder_path = utils.get_folder_path(source=SOURCE_PMU, date=date)
 
     filename = os.path.join(day_folder_path, f'{"PROGRAMME".lower()}.json')
     url = get_pmu_api_url(url_name="PROGRAMME", date=date)

@@ -5,7 +5,7 @@ import time
 from cachetools import func
 import pytz
 
-from scripts.scrape_pmu_data import get_pmu_api_url
+from utils.pmu_api_data import get_pmu_api_url
 from requests.exceptions import ConnectionError
 from utils.scrape import execute_get_query, create_day_folder
 
@@ -116,7 +116,7 @@ def run():
         except ConnectionError as e:
             retry_count += 1
             print(
-                f"\r[{start_date.isoformat()}] Connection Error n° {retry_count}: {e}",
+                f"\r[{start_date.isoformat()}] Connection Error n°{retry_count}: {e}",
                 end="",
             )
         end_date = dt.datetime.now()
@@ -124,7 +124,7 @@ def run():
             print(
                 f"\r[{end_date.isoformat()}] Time to execute: "
                 f"{(end_date-start_date).total_seconds():.2}s, "
-                f"{new_queries} queries made",
+                f"{new_queries} queries made (total: {query_count})",
                 end="\n",
             )
             query_count += new_queries

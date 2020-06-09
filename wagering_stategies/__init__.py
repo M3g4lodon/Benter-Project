@@ -85,7 +85,7 @@ def race_bettings_kelly(
     odds_race = np.where(
         previous_stakes > 0,
         previous_stakes.sum() / previous_stakes,
-        previous_stakes.sum() + PMU_MINIMUM_BET_SIZE / PMU_MINIMUM_BET_SIZE,
+        (previous_stakes.sum() + PMU_MINIMUM_BET_SIZE) / PMU_MINIMUM_BET_SIZE * np.ones_like(previous_stakes),
     )
     expected_return_race = y_hat_race * odds_race * (1 - track_take)
 

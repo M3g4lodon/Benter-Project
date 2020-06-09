@@ -1,7 +1,6 @@
-import datetime as dt
 import os
 import re
-from typing import Optional, Dict, List
+from typing import Optional, Dict
 
 import numpy as np
 import pandas as pd
@@ -9,173 +8,11 @@ from tqdm import tqdm
 
 import utils
 from constants import PMU_DATA_DIR, DATA_DIR
+from utils.pmu_api_data import get_race_horses_records
 from utils import features
 
 # TODO investigate driverchange column
 # TODO investigate 'engagement' column
-
-
-def get_num_pmu_from_name(
-    horse_name: str, participants: Optional[dict]
-) -> Optional[int]:
-    if not participants:
-        return None
-    horse_ = [part for part in participants if part["nom"] == horse_name]
-    if len(horse_) != 1:
-        return None
-    horse = horse_[0]
-    if "numPmu" not in horse:
-        return None
-    return horse["numPmu"]
-
-
-def get_last_race_date_from_performance(
-    performance_json: dict, participants=None
-) -> Optional[dict]:
-    if "participants" not in performance_json:
-        return None
-
-    res = {}
-    for perf in performance_json["participants"]:
-        if "coursesCourues" not in perf:
-            continue
-        if "numPmu" not in perf:
-            if "nomCheval" not in perf:
-                continue
-            num_pmu = get_num_pmu_from_name(
-                horse_name=perf["nomCheval"], participants=participants
-            )
-
-        else:
-            num_pmu = perf["numPmu"]
-        if num_pmu is None:
-            continue
-
-        if not perf["coursesCourues"]:
-            continue
-        dates = [
-            course["date"] for course in perf["coursesCourues"] if "date" in course
-        ]
-        if not dates:
-            continue
-        max_date = max(dates)
-
-        res[num_pmu] = dt.date.fromtimestamp(max_date / 1000)
-    if not res:
-        return None
-    return res
-
-
-def get_num_pmu_enjeu_from_citations(
-    citations: dict, pari_type: str, num_pmu_partants: Optional[List[int]] = None
-) -> Optional[dict]:
-    if "listeCitations" not in citations:
-        return None
-    citations_ = [
-        citation
-        for citation in citations["listeCitations"]
-        if citation["typePari"] == pari_type
-    ]
-    assert len(citations_) <= 1
-    if not citations_:
-        return None
-    citation = citations_[0]
-    if "participants" not in citation:
-        return None
-
-    if num_pmu_partants is None:
-        return {
-            part["numPmu"]: part["citations"][0]["enjeu"]
-            for part in citation["participants"]
-        }
-    return {
-        part["numPmu"]: part["citations"][0]["enjeu"]
-        for part in citation["participants"]
-        if part["numPmu"] in num_pmu_partants
-    }
-
-
-def get_num_pmu_enjeu_from_combinaisons(
-    combinaisons: dict, pari_type: str, num_pmu_partants: Optional[List[int]] = None
-) -> Optional[dict]:
-    if "combinaisons" not in combinaisons:
-        return None
-    _combs = [
-        comb for comb in combinaisons["combinaisons"] if comb["pariType"] == pari_type
-    ]
-    assert len(_combs) <= 1
-    if not _combs:
-        return None
-    combinaison = _combs[0]
-    if "listeCombinaisons" not in combinaison:
-        return None
-    if not all("combinaison" in comb for comb in combinaison["listeCombinaisons"]):
-        return None
-
-    if not all("totalEnjeu" in comb for comb in combinaison["listeCombinaisons"]):
-        return None
-
-    if num_pmu_partants is None:
-        return {
-            comb["combinaison"][0]: comb["totalEnjeu"]
-            for comb in combinaison["listeCombinaisons"]
-        }
-    return {
-        comb["combinaison"][0]: comb["totalEnjeu"]
-        for comb in combinaison["listeCombinaisons"]
-        if comb["combinaison"][0] in num_pmu_partants
-    }
-
-
-def get_num_pmu_enjeu_from_rapport_simple_enjeux(
-    rapport_simple_gagnant: dict,
-    enjeux: dict,
-    pari_type: str,
-    num_pmu_partants: Optional[List[int]] = None,
-) -> Optional[dict]:
-    if "rapportsParticipants" not in rapport_simple_gagnant:
-        return None
-
-    if "data" not in enjeux:
-        return None
-
-    if not all(
-        "numPmu" in rapport and "rapportDirect" in rapport
-        for rapport in rapport_simple_gagnant["rapportsParticipant"]
-    ):
-        return None
-    if not all("data" in enjeu and "typesParis" in enjeu for enjeu in enjeux["data"]):
-        return None
-
-    mutual_proba = {
-        rapport["numPmu"]: 1 / rapport["rapportDirect"]
-        for rapport in rapport_simple_gagnant["rapportsParticipant"]
-    }
-    enjeu_ = [enjeu for enjeu in enjeux["data"] if pari_type in enjeu["typesParis"]]
-    if not enjeu_:
-        return None
-    assert len(enjeu_) == 1
-    total_enjeu = enjeu_[0]["totalEnjeu"]
-
-    correction_coefficient = sum(
-        proba for num_pmu, proba in mutual_proba.items() if num_pmu in num_pmu_partants
-    )
-
-    return {
-        num_pmu: total_enjeu * proba / correction_coefficient
-        for num_pmu, proba in mutual_proba.items()
-        if num_pmu in num_pmu_partants
-    }
-
-
-def get_penetrometer_value(course: dict) -> Optional[float]:
-    if "penetrometre" not in course:
-        return None
-    if "valeurMesure" not in course["penetrometre"]:
-        return None
-    penetrometer_value: str = course["penetrometre"]["valeurMesure"]
-    penetrometer_value = penetrometer_value.replace(",", ".")
-    return float(penetrometer_value)
 
 
 def load_queried_data() -> pd.DataFrame:
@@ -223,186 +60,17 @@ def load_queried_data() -> pd.DataFrame:
                 r_i = course["numReunion"]
                 c_i = course["numOrdre"]
 
-                course_race_datetime = dt.datetime.fromtimestamp(
-                    course["heureDepart"] / 1000,
-                    tz=dt.timezone(dt.timedelta(milliseconds=course["timezoneOffset"])),
+                race_horses_records = get_race_horses_records(
+                    programme=programme_json,
+                    date=date,
+                    r_i=r_i,
+                    c_i=c_i,
+                    should_be_on_disk=True,
                 )
-                participants_ = utils.load_json(
-                    filename=os.path.join(
-                        folder_path, f"R{r_i}_C{c_i}_participants.json"
-                    )
-                )
-                if participants_ is None or "participants" not in participants_:
+                if race_horses_records is None:
                     continue
-                participants_ = participants_["participants"]
-                participants = [
-                    {k: v for k, v in part.items() if not isinstance(v, dict)}
-                    for part in participants_
-                ]
-                performance_json = utils.load_json(
-                    filename=os.path.join(
-                        folder_path, f"R{r_i}_C{c_i}_performance.json"
-                    )
-                )
-                last_race_date = get_last_race_date_from_performance(
-                    performance_json=performance_json, participants=participants
-                )
 
-                num_pmu_partants = [
-                    part["numPmu"]
-                    for part in participants
-                    if part["statut"] == "PARTANT"
-                ]
-
-                pari_type = (
-                    "E_SIMPLE_GAGNANT" if course["hasEParis"] else "SIMPLE_GAGNANT"
-                )
-
-                citations = utils.load_json(
-                    filename=os.path.join(
-                        folder_path,
-                        f"R{r_i}_C{c_i}_{'CITATIONS_INTERNET'.lower() if course['hasEParis'] else 'CITATIONS'.lower()}.json",
-                    )
-                )
-                num_pmu_enjeu = get_num_pmu_enjeu_from_citations(
-                    citations=citations,
-                    pari_type=pari_type,
-                    num_pmu_partants=num_pmu_partants,
-                )
-                is_true_total_enjeu = True
-
-                if len(num_pmu_partants) <= 12 and num_pmu_enjeu is None:
-                    combinaisons = utils.load_json(
-                        filename=os.path.join(
-                            folder_path,
-                            f"R{r_i}_C{c_i}_{'COMBINAISONS_INTERNET'.lower() if course['hasEParis'] else 'COMBINAISONS'.lower()}.json",
-                        )
-                    )
-
-                    num_pmu_enjeu = get_num_pmu_enjeu_from_combinaisons(
-                        combinaisons=combinaisons,
-                        pari_type=pari_type,
-                        num_pmu_partants=num_pmu_partants,
-                    )
-
-                if num_pmu_enjeu is None:
-                    rapport_simple_gagnant = utils.load_json(
-                        filename=os.path.join(
-                            folder_path,
-                            f"R{r_i}_C{c_i}_{pari_type}_{'RAPPORTS'.lower()}.json",
-                        )
-                    )
-
-                    enjeux = utils.load_json(
-                        filename=os.path.join(
-                            folder_path,
-                            f"R{r_i}_C{c_i}_{'ENJEU_INTERNET'.lower() if course['hasEParis'] else 'ENJEU'.lower()}.json",
-                        )
-                    )
-                    num_pmu_enjeu = get_num_pmu_enjeu_from_rapport_simple_enjeux(
-                        rapport_simple_gagnant=rapport_simple_gagnant,
-                        enjeux=enjeux,
-                        pari_type=pari_type,
-                        num_pmu_partants=num_pmu_partants,
-                    )
-                    is_true_total_enjeu = num_pmu_enjeu is None
-                penetrometer_value = get_penetrometer_value(cours=course)
-                course_incidents = course["incidents"] if "incidents" in course else []
-                incident_nums = {
-                    num_part
-                    for incident in course_incidents
-                    for num_part in incident["numeroParticipants"]
-                }
-                for part, part_ in zip(participants, participants_):
-                    # TODO integrate other dict keys
-                    # dict key found {'commentaireApresCourse',
-                    #  'dernierRapportDirect',
-                    #  'dernierRapportReference',
-                    #  'distanceChevalPrecedent',
-                    #  'gainsParticipant', # added here
-                    #  'robe'}
-                    if "gainsParticipant" in part_:
-                        part.update(part_["gainsParticipant"])
-                    part["n_reunion"] = r_i
-                    part["n_course"] = c_i
-                    part["date"] = date
-                    part["race_datetime"] = course_race_datetime
-                    part["in_incident"] = part["numPmu"] in incident_nums
-                    part["incident_type"] = (
-                        None
-                        if part["numPmu"] not in incident_nums
-                        else [
-                            incident["type"]
-                            for incident in course_incidents
-                            if part["numPmu"] in incident["numeroParticipants"]
-                        ][0]
-                    )
-                    part["totalEnjeu"] = (
-                        None
-                        if num_pmu_enjeu is None
-                        else num_pmu_enjeu.get(part["numPmu"], None)
-                    )
-
-                    part["last_race_date"] = (
-                        None
-                        if last_race_date is None
-                        else last_race_date.get(part["numPmu"], None)
-                    )
-                    handicap_weight = None
-                    if "poidsConditionMonte" in part and part["poidsConditionMonte"]:
-                        handicap_weight = part["poidsConditionMonte"]
-                    elif "handicapPoids" in part and part["handicapPoids"]:
-                        handicap_weight = part["handicapPoids"]
-
-                    part["handicap_weight"] = handicap_weight  # in hectogram
-                    part["is_true_total_enjeu"] = is_true_total_enjeu
-                    part["reunion_nature"] = reunion["nature"]
-                    part["reunion_audience"] = reunion["audience"]
-                    part["reunion_pays"] = reunion["pays"]["code"]
-                    part["course_statut"] = course["statut"]
-                    part["course_discipline"] = course["discipline"]
-                    part["course_specialite"] = course["specialite"]
-                    part["course_condition_sexe"] = course["conditionSexe"]
-                    part["course_condition_age"] = (
-                        None if "conditionAge" not in course else course["conditionAge"]
-                    )
-                    part["course_track_type"] = (
-                        None if "typePiste" not in course else course["typePiste"]
-                    )
-
-                    part["course_penetrometre"] = penetrometer_value
-                    # TODO Deal with ecurie
-                    part["course_corde"] = (
-                        None if "corde" not in course else course["corde"]
-                    )
-                    part["course_hippodrome"] = (
-                        None
-                        if "hippodrome" not in course
-                        else course["hippodrome"]["codeHippodrome"]
-                    )
-                    part["course_parcours"] = (
-                        None if "parcours" not in course else course["parcours"]
-                    )
-                    part["course_distance"] = (
-                        None if "distance" not in course else course["distance"]
-                    )
-                    part["course_distance_unit"] = (
-                        None if "distanceUnit" not in course else course["distanceUnit"]
-                    )
-                    part["course_duration"] = (
-                        None if "dureeCourse" not in course else course["dureeCourse"]
-                    )
-                    part["course_prize_pool"] = (
-                        None
-                        if "montantTotalOffert" not in course
-                        else course["montantTotalOffert"]
-                    )  # TODO look at difference with "montantPrix"
-                    part["course_winner_prize"] = (
-                        None
-                        if "montantOffert1er" not in course
-                        else course["montantOffert1er"]
-                    )
-                race_records.extend(participants)
+                race_records.extend(race_horses_records)
                 race_count += 1
 
     return pd.DataFrame.from_records(data=race_records)
@@ -432,13 +100,44 @@ def _create_horse_name_mapper(rh_df: pd.DataFrame) -> Dict[str, int]:
 def convert_queried_data_to_race_horse_df(
     queried_race_horse_df: pd.DataFrame,
     historical_race_horse_df: Optional[pd.DataFrame],
-):
+)->pd.DataFrame:
     """Will convert queried race horse df into the right format.
 
     If `historical_race_horse_df`is provided, the converted race/horses will be formatted as an extension of it """
 
     race_horse_df = queried_race_horse_df
-    for col_name in ["nomPereMere", "ordreArrivee"]:
+
+    for col_name in ["date", "n_reunion", "n_course", "statut", "totalEnjeu"]:
+        assert col_name in race_horse_df, f"{col_name} column is missing race_horse_df"
+
+    for col_name in [
+        "nom",
+        "nomPere",
+        "nomMere",
+        "nomPereMere",
+        "sexe",
+        "numPmu",
+        "driver",
+        "age",
+        "race",
+        "jumentPleine",
+        "entraineur",
+        "proprietaire",
+        "eleveur",
+        "ordreArrivee",
+        "nombreCourses",
+        "nombreVictoires",
+        "nombrePlaces",
+        "deferre",
+        "tempsObtenu",
+        "gainsAnneeEnCours",
+        "gainsAnneePrecedente",
+        "gainsCarriere",
+        "oeilleres",
+        "handicapDistance",
+        "handicapValeur",
+        "last_race_date"
+    ]:
         if col_name not in race_horse_df:
             race_horse_df[col_name] = np.nan
 
@@ -568,11 +267,17 @@ def convert_queried_data_to_race_horse_df(
     ].map(sum_per_race)
     race_horse_df["odds"] = 1 / race_horse_df["pari_mutuel_proba"]
 
+    race_horse_df["duration_since_last_race"] = (
+            pd.to_datetime(race_horse_df["date"]).dt.date
+            - pd.to_datetime(race_horse_df["last_race_date"]).dt.date
+    )
+
     return race_horse_df
 
 
 def check_df(featured_race_horse_df: pd.DataFrame):
     assert not featured_race_horse_df["odds"].isna().all()
+    assert not featured_race_horse_df["totalEnjeu"].isna().all()
 
 
 def run():
@@ -585,11 +290,6 @@ def run():
     # Compute features
     featured_race_horse_df = features.append_features(
         race_horse_df=race_horse_df, historical_race_horse_df=race_horse_df
-    )
-
-    featured_race_horse_df["duration_since_last_race"] = (
-        pd.to_datetime(featured_race_horse_df["date"]).dt.date
-        - pd.to_datetime(featured_race_horse_df["last_race_date"]).dt.date
     )
 
     check_df(featured_race_horse_df=featured_race_horse_df)

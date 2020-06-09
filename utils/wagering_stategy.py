@@ -21,7 +21,7 @@ initial_capital = 100 * 100  # 100.00€
 
 
 def compute_expected_return(
-    compute_betting: Callable,
+    compute_betting_fun: Callable,
     source: str,
     code_pari: str,
     winning_model: AbstractWinningModel,
@@ -32,7 +32,9 @@ def compute_expected_return(
         1
     ]
     records = []
-    n_races = import_data.get_n_races(source=source, on_split="val", remove_nan_previous_stakes=True)
+    n_races = import_data.get_n_races(
+        source=source, on_split="val", remove_nan_previous_stakes=True
+    )
     for x_race, y_race, race_df in tqdm(
         import_data.get_dataset_races(
             source=source,
@@ -44,13 +46,12 @@ def compute_expected_return(
         leave=False,
         total=n_races,
     ):
-        betting_race = compute_betting(
+        betting_race = compute_betting_fun(
             x_race=x_race,
             previous_stakes=race_df["totalEnjeu"],
             winning_model=winning_model,
             track_take=track_take,
             capital_fraction=1.0,
-
         )
 
         assert 0 <= np.sum(betting_race) or np.isclose(np.sum(betting_race), 0.0)
@@ -93,7 +94,9 @@ def compute_scenario(
     np.random.seed(42)
     capital_value = initial_capital
     records = []
-    n_races = import_data.get_n_races(source=source, on_split="val", remove_nan_previous_stakes=True)
+    n_races = import_data.get_n_races(
+        source=source, on_split="val", remove_nan_previous_stakes=True
+    )
     for x_race, y_race, race_df in tqdm(
         import_data.get_dataset_races(
             source=source,
@@ -147,6 +150,7 @@ def compute_scenario(
 
 
 def plot_scenario(scenario_df: pd.DataFrame):
+    scenario_df["#_races"] = scenario_df.index.to_series()
     ax = sns.lineplot(data=scenario_df, x="#_races", y="Capital",)
     ax.set(yscale="log")
     plt.show()

@@ -100,15 +100,24 @@ def run():
     print("Query Odds before races from Unibet/turf")
 
     query_count = 0
+    retry_count = 0
     while True:
         start_date = dt.datetime.now()
-        new_queries = update()
+        new_queries = None
+        try:
+            new_queries = update()
+        except ConnectionError as e:
+            retry_count += 1
+            print(
+                f"\r[{start_date.isoformat()}] Connection Error n°{retry_count}: {e}",
+                end="",
+            )
         end_date = dt.datetime.now()
         if new_queries:
             print(
                 f"\r[{end_date.isoformat()}] Time to execute: "
                 f"{(end_date-start_date).total_seconds():.2}s, "
-                f"{new_queries} queries made",
+                f"{new_queries} queries made (total: {query_count})",
                 end="\n",
             )
             query_count += new_queries

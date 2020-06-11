@@ -2,13 +2,14 @@ import datetime as dt
 import os
 import time
 
-from cachetools import func
 import pytz
-
-from utils.scrape import execute_get_query, create_day_folder
+import requests
+from cachetools import func
 
 import utils
 from constants import UNIBET_DATA_DIR
+from utils.scrape import create_day_folder
+from utils.scrape import execute_get_query
 
 TIMEZONE = "Europe/Paris"
 
@@ -36,7 +37,8 @@ def execute_queries(seconds_before: int, race_times: dict) -> int:
 @func.ttl_cache(maxsize=10, ttl=60)
 def query_program(date: dt.date) -> dict:
     return execute_get_query(
-        url=f"https://www.unibet.fr/zones/turf/program.json?date={date.strftime('%Y-%m-%d')}"
+        url=f"https://www.unibet.fr/zones/turf/program.json?"
+        f"date={date.strftime('%Y-%m-%d')}"
     )
 
 
@@ -77,7 +79,8 @@ def update():
     time_to_next_race = min(coming_races.values())
     if time_to_next_race.total_seconds() > 60 * 10:
         print(
-            f"\r[{dt.datetime.now().isoformat()}] Next race in {time_to_next_race}, waiting 1 min...",
+            f"\r[{dt.datetime.now().isoformat()}] Next race in "
+            f"{time_to_next_race}, waiting 1 min...",
             end="",
         )
         time.sleep(60)
@@ -106,7 +109,7 @@ def run():
         new_queries = None
         try:
             new_queries = update()
-        except ConnectionError as e:
+        except requests.ConnectionError as e:
             retry_count += 1
             print(
                 f"\r[{start_date.isoformat()}] Connection Error n°{retry_count}: {e}",

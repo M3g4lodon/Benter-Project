@@ -3,7 +3,8 @@
 https://communaute-aide.pmu.fr/questions/1332044-lire-musique-cheval
 1. Pour tous les chevaux :
 
-- " 0" indique qu'il n'a pas été classé parmi les 10 premiers, tout chiffre différent de 0 indique la place du cheval dans la course
+- " 0" indique qu'il n'a pas été classé parmi les 10 premiers, tout chiffre
+    différent de 0 indique la place du cheval dans la course
 
 - " T" indique qu'il est tombé
 
@@ -59,7 +60,7 @@ def parse_music(music: str, verbose=False) -> ParsedMusic:
         if any("inédit" in e for e in event):
             continue
 
-        if any("(r)" == e for e in event):
+        if any(e == "(r)" for e in event):
             continue
         if len(event) != 2:
             continue

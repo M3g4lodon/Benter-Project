@@ -1,12 +1,11 @@
 import numpy as np
 import pytest
-from utils.winning_validation import (
-    exact_top_k,
-    same_top_k,
-    precision_at_k,
-    compute_rank_proba,
-    kappa_cohen_like,
-)
+
+from utils.winning_validation import compute_rank_proba
+from utils.winning_validation import exact_top_k
+from utils.winning_validation import kappa_cohen_like
+from utils.winning_validation import precision_at_k
+from utils.winning_validation import same_top_k
 
 
 @pytest.mark.parametrize(
@@ -120,7 +119,7 @@ def test_compute_rank_proba(proba_distribution, rank_race, k, result):
 
     assert np.isclose(
         compute_rank_proba(
-            proba_distribution=proba_distribution, rank_race=rank_race, k=k,
+            proba_distribution=proba_distribution, rank_race=rank_race, k=k
         ),
         result,
     )

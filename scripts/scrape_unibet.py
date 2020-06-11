@@ -4,8 +4,11 @@ import os
 from tqdm import tqdm
 
 import utils
-from constants import UNIBET_DATA_DIR, UNIBET_MIN_DATE
-from utils.scrape import execute_get_query, create_day_folder, check_query_json
+from constants import UNIBET_DATA_DIR
+from constants import UNIBET_MIN_DATE
+from utils.scrape import check_query_json
+from utils.scrape import create_day_folder
+from utils.scrape import execute_get_query
 
 
 def download_day_races(date: dt.date, replace_if_exists: bool = True) -> int:
@@ -13,24 +16,27 @@ def download_day_races(date: dt.date, replace_if_exists: bool = True) -> int:
     day_folder_path = os.path.join(UNIBET_DATA_DIR, date.isoformat())
 
     filename = os.path.join(day_folder_path, f'{"PROGRAMME".lower()}.json')
-    url = f"https://www.unibet.fr/zones/turf/program.json?date={date.strftime('%Y-%m-%d')}"
+    url = (
+        f"https://www.unibet.fr/zones/turf/program.json?"
+        f"date={date.strftime('%Y-%m-%d')}"
+    )
     if (
-            replace_if_exists
-            or not os.path.exists(filename)
-            or not check_query_json(filename=filename, url=url)
+        replace_if_exists
+        or not os.path.exists(filename)
+        or not check_query_json(filename=filename, url=url)
     ):
         day_races = execute_get_query(url=url)
         query_count += 1
         utils.dump_json(data=day_races, filename=filename)
     else:
-        day_races = utils.load_json(filename)
-        assert day_races is not None
+        day_races = utils.load_json(filename=filename)
+        assert day_races
 
-    if 'data' not in day_races:
-        print(f'No data for {date.isoformat()}')
+    if "data" not in day_races:
+        print(f"No data for {date.isoformat()}")
         return query_count
 
-    for session in tqdm(day_races['data'], desc=date.isoformat(), leave=False):
+    for session in tqdm(day_races["data"], desc=date.isoformat(), leave=False):
         for race in session["races"]:
 
             filename = os.path.join(
@@ -40,9 +46,9 @@ def download_day_races(date: dt.date, replace_if_exists: bool = True) -> int:
                 f'https://www.unibet.fr/zones/turf/race.json?raceId={race["zeturfId"]}'
             )
             if (
-                    replace_if_exists
-                    or not os.path.exists(filename)
-                    or not check_query_json(filename=filename, url=url)
+                replace_if_exists
+                or not os.path.exists(filename)
+                or not check_query_json(filename=filename, url=url)
             ):
                 utils.dump_json(data=execute_get_query(url=url), filename=filename)
                 query_count += 1
@@ -55,7 +61,8 @@ def run():
     today = dt.date.today()
 
     print(
-        f"Scraping Unibet website from {UNIBET_MIN_DATE.isoformat()} to {today.isoformat()}"
+        f"Scraping Unibet website from "
+        f"{UNIBET_MIN_DATE.isoformat()} to {today.isoformat()}"
     )
 
     query_count = 0

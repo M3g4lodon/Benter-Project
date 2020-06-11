@@ -7,15 +7,17 @@ import seaborn as sns
 from tqdm import tqdm
 
 from constants import PMU_BETTINGS
+from utils import import_data
 from utils.expected_return import get_race_odds
 from wagering_stategies import race_betting_proportional_positive_return
 from winning_horse_models import AbstractWinningModel
-from utils import import_data
 
 initial_capital = 100 * 100  # 100.00€
 
-# TODO add more stat (max drawdown, look at master thesis, max number of losses, expexted return, return distribution,
-#  standard deviation of returns, EDA on returns to find bias, expected winning proba, average length of loss streak...)
+# TODO add more stat (max drawdown, look at master thesis, max number of losses,
+#  expexted return, return distribution,
+#  standard deviation of returns, EDA on returns to find bias,
+#  expected winning proba, average length of loss streak...)
 # TODO mininum betting of 150 (1.5€)
 # TODO add feedback effect of betting
 
@@ -54,7 +56,7 @@ def compute_expected_return(
             capital_fraction=1.0,
         )
 
-        assert 0 <= np.sum(betting_race) or np.isclose(np.sum(betting_race), 0.0)
+        assert np.sum(betting_race) >= 0 or np.isclose(np.sum(betting_race), 0.0)
         assert np.sum(betting_race) <= 1 or np.isclose(np.sum(betting_race), 1.0)
 
         actual_betting = np.round(betting_race)
@@ -115,7 +117,7 @@ def compute_scenario(
             winning_model=winning_model,
             capital_fraction=capital_fraction,
         )
-        assert 0 <= np.sum(betting_race) or np.isclose(np.sum(betting_race), 0.0), (
+        assert np.sum(betting_race) >= 0 or np.isclose(np.sum(betting_race), 0.0), (
             f"{betting_race} sum {np.sum(betting_race)} can not be below 0.0, "
             f"on race id {race_df['id'].iloc[0]}"
         )
@@ -151,7 +153,7 @@ def compute_scenario(
 
 def plot_scenario(scenario_df: pd.DataFrame):
     scenario_df["#_races"] = scenario_df.index.to_series()
-    ax = sns.lineplot(data=scenario_df, x="#_races", y="Capital",)
+    ax = sns.lineplot(data=scenario_df, x="#_races", y="Capital")
     ax.set(yscale="log")
     plt.show()
 
@@ -159,7 +161,8 @@ def plot_scenario(scenario_df: pd.DataFrame):
         scenario_df["Capital"].iloc[-1] / scenario_df["Capital"].iloc[0]
     ) / len(scenario_df)
     print(
-        f"End capital: {scenario_df['Capital'].iloc[-1]:.2f}, exponential growth rate: {exp_growth_rate:.2%}"
+        f"End capital: {scenario_df['Capital'].iloc[-1]:.2f}, "
+        f"exponential growth rate: {exp_growth_rate:.2%}"
     )
     sns.distplot(scenario_df["Relative Return"])
     plt.show()
@@ -167,13 +170,15 @@ def plot_scenario(scenario_df: pd.DataFrame):
     if (scenario_df["Capital"] == 0).any():
         zero_capital_index = scenario_df[scenario_df["Capital"] == 0]["#_races"].iloc[0]
         print(
-            f"No more capital after race n°{zero_capital_index + 1} (index {zero_capital_index})"
+            f"No more capital after race n°{zero_capital_index + 1} "
+            f"(index {zero_capital_index})"
         )
     else:
         print("Capital is never null!")
 
 
 def run():
+    # pylint:disable=import-outside-toplevel
     from winning_horse_models.baselines import RandomModel
 
     compute_scenario(

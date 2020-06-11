@@ -47,7 +47,8 @@ def race_betting_best_expected_return(
     winning_model: AbstractWinningModel,
     capital_fraction: float,
 ) -> np.array:
-    """Returns bettings putting all capital fraction on the best expected return (if it is positive)"""
+    """Returns bettings putting all capital fraction on the best expected return
+    (if it is positive)"""
     n_horses = x_race.shape[0]
 
     y_hat_race = winning_model.predict(x=np.expand_dims(x_race, axis=0))[0, :]
@@ -140,7 +141,8 @@ def race_betting_best_winning_proba(
     winning_model: AbstractWinningModel,
     capital_fraction: float,
 ) -> np.array:
-    """Returns bettings with all capital_fraction on the best horse according to winning_model"""
+    """Returns bettings with all capital_fraction on the best horse
+    according to winning_model"""
     y_hat_race = winning_model.predict(x=np.expand_dims(x_race, axis=0))[0, :]
     assert np.isclose(y_hat_race.sum(), 1.0)
     betting = y_hat_race == y_hat_race.max()
@@ -156,7 +158,8 @@ def race_betting_best_winning_proba_not_max_pari_mutual_proba(
     winning_model: AbstractWinningModel,
     capital_fraction: float,
 ) -> np.array:
-    """Returns the best winning proba horse that is not the horse with the most bets on"""
+    """Returns the best winning proba horse that is not the horse
+    with the most bets on"""
     y_hat_race = winning_model.predict(x=np.expand_dims(x_race, axis=0))[0, :]
     assert np.isclose(y_hat_race.sum(), 1.0)
     betting = np.logical_and(
@@ -206,7 +209,8 @@ def race_rickiest_horse(
     winning_model: AbstractWinningModel,
     capital_fraction: float,
 ) -> np.array:
-    """Returns bettings with capital_fraction put on rickiest horse according to pari-mutual odds"""
+    """Returns bettings with capital_fraction put on rickiest horse according
+    to pari-mutual odds"""
     betting = previous_stakes == previous_stakes.min()
     betting = betting / np.sum(betting)
     betting = betting * capital_fraction
@@ -220,7 +224,8 @@ def race_least_risky_horse(
     winning_model: AbstractWinningModel,
     capital_fraction: float,
 ) -> np.array:
-    """Returns bettings with capital_fraction put on least ricky horse according to pari-mutual odds"""
+    """Returns bettings with capital_fraction put on least ricky horse according
+    to pari-mutual odds"""
     betting = previous_stakes == previous_stakes.max()
     betting = betting / np.sum(betting)
     betting = betting * capital_fraction
@@ -247,7 +252,8 @@ def race_proportional_pari_mutual_proba(
     winning_model: AbstractWinningModel,
     capital_fraction: float,
 ) -> np.array:
-    """Return bettings proportional to inverse of pari-mutual odds (pari-mutual probabilities)"""
+    """Return bettings proportional to inverse of pari-mutual odds
+    (pari-mutual probabilities)"""
     betting = previous_stakes / np.sum(previous_stakes)
     betting = betting * capital_fraction
     return betting

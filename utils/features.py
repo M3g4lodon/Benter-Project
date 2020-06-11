@@ -25,7 +25,8 @@ DONE v1
     driver
     race_type
     état du sol (type sol, penetrometre)
-    duration since last race -> performance.json (remaining to compute timedelta between last_race and date)
+    duration since last race -> performance.json (remaining to
+        compute timedelta between last_race and date)
 
 
 TODO
@@ -100,25 +101,29 @@ def get_race_horse_features(
     }
 
 
-def append_features(race_horse_df: pd.DataFrame, historical_race_horse_df:pd.DataFrame) -> pd.DataFrame:
+def append_features(
+    race_horse_df: pd.DataFrame, historical_race_horse_df: pd.DataFrame
+) -> pd.DataFrame:
     @functools.lru_cache(maxsize=None)
     def get_jockey_history(jockey_name: str) -> pd.DataFrame:
-        return historical_race_horse_df[historical_race_horse_df["jockey_name"] == jockey_name][
-            ["race_datetime", "horse_place"]
-        ].dropna(axis=0)
+        return historical_race_horse_df[
+            historical_race_horse_df["jockey_name"] == jockey_name
+        ][["race_datetime", "horse_place"]].dropna(axis=0)
 
     @functools.lru_cache(maxsize=None)
     def get_trainer_history(trainer_name: str) -> pd.DataFrame:
-        return historical_race_horse_df[historical_race_horse_df["trainer_name"] == trainer_name][
-            ["race_datetime", "horse_place"]
-        ].dropna(axis=0)
+        return historical_race_horse_df[
+            historical_race_horse_df["trainer_name"] == trainer_name
+        ][["race_datetime", "horse_place"]].dropna(axis=0)
 
     records = []
 
     # TODO multiprocess this (https://github.com/tqdm/tqdm/issues/484)
     for rh_serie in tqdm(
         race_horse_df.itertuples(index=True, name="Race_Horse"),
-        total=len(race_horse_df), desc="Appending features", unit="horse_in_race"
+        total=len(race_horse_df),
+        desc="Appending features",
+        unit="horse_in_race",
     ):
         features_dict = get_race_horse_features(
             rh_serie=rh_serie,

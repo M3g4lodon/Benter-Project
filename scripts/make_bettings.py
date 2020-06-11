@@ -7,16 +7,14 @@ import pytz
 from tabulate import tabulate
 
 import wagering_stategies
-from constants import PMU_BETTINGS, SOURCE_PMU
+from constants import PMU_BETTINGS
+from constants import SOURCE_PMU
 from scripts.generate_pmu_data import convert_queried_data_to_race_horse_df
-from utils.pmu_api_data import (
-    get_pmu_api_url,
-    get_num_pmu_enjeu_from_citations,
-    get_race_horses_records,
-)
-from utils.scrape import execute_get_query
 from utils import features
 from utils import import_data
+from utils.pmu_api_data import get_pmu_api_url
+from utils.pmu_api_data import get_race_horses_records
+from utils.scrape import execute_get_query
 from winning_horse_models import AbstractWinningModel
 from winning_horse_models.logistic_regression import LogisticRegressionModel
 
@@ -62,8 +60,8 @@ def get_race_df(
         race_horse_df=race_df, historical_race_horse_df=historical_race_horse_df
     )
     race_df["duration_since_last_race"] = (
-            pd.to_datetime(race_df["date"]).dt.date
-            - pd.to_datetime(race_df["last_race_date"]).dt.date
+        pd.to_datetime(race_df["date"]).dt.date
+        - pd.to_datetime(race_df["last_race_date"]).dt.date
     )
 
     race_df = race_df[race_df["statut"] != "NON_PARTANT"]
@@ -76,7 +74,7 @@ def get_race_df(
 def append_bettings_to_race_df(
     race_df: pd.DataFrame, winning_model: AbstractWinningModel, track_take: float
 ) -> pd.DataFrame:
-    x_race, y_race, odds_race = import_data.extract_x_y_odds(
+    x_race, _, odds_race = import_data.extract_x_y_odds(
         race_df=race_df,
         source=SOURCE_PMU,
         x_format="sequential_per_horse",
@@ -106,17 +104,16 @@ def append_bettings_to_race_df(
 def suggest_betting_on_next_race():
     (historical_race_horse_df, track_take, winning_model) = _variables_to_query_once()
 
-    date = dt.date.today()
+    today = dt.date.today()
 
-    tz = pytz.timezone(TIMEZONE)
-    dt_now = tz.localize(dt.datetime.now())
+    dt_now = pytz.timezone(TIMEZONE).localize(dt.datetime.now())
 
-    programme = execute_get_query(url=get_pmu_api_url(url_name="PROGRAMME", date=date))
+    programme = execute_get_query(url=get_pmu_api_url(url_name="PROGRAMME", date=today))
 
     race_times = {}
     for reunion in programme["programme"]["reunions"]:
         for course in reunion["courses"]:
-            race_times[(date, course["numReunion"], course["numOrdre"])] = (
+            race_times[(today, course["numReunion"], course["numOrdre"])] = (
                 dt.datetime.fromtimestamp(
                     course["heureDepart"] / 1000,
                     tz=dt.timezone(dt.timedelta(milliseconds=course["timezoneOffset"])),
@@ -125,18 +122,19 @@ def suggest_betting_on_next_race():
             )
 
     coming_races = {
-        (date, r_i, c_i): time_to_race
-        for (date, r_i, c_i), time_to_race in race_times.items()
+        (today, r_i, c_i): time_to_race
+        for (today, r_i, c_i), time_to_race in race_times.items()
         if time_to_race.total_seconds() > 0
     }
     next_date, r_i, c_i = min(coming_races, key=coming_races.get)
     print(
-        f"Time to next race: {coming_races[(next_date, r_i, c_i)]}, date {date}, R{r_i} C{c_i}"
+        f"Time to next race: {coming_races[(next_date, r_i, c_i)]}, "
+        f"date {today}, R{r_i} C{c_i}"
     )
-    print(f"https://www.pmu.fr/turf/{date.strftime('%d%m%Y')}/R{r_i}/C{c_i}")
+    print(f"https://www.pmu.fr/turf/{today.strftime('%d%m%Y')}/R{r_i}/C{c_i}")
 
     race_df = get_race_df(
-        date=date,
+        date=today,
         r_i=r_i,
         c_i=c_i,
         historical_race_horse_df=historical_race_horse_df,

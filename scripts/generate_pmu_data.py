@@ -1,15 +1,19 @@
+import datetime as dt
 import os
 import re
-from typing import Optional, Dict
+from typing import Dict
+from typing import Optional
+from typing import Tuple
 
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
 import utils
-from constants import PMU_DATA_DIR, DATA_DIR
-from utils.pmu_api_data import get_race_horses_records
+from constants import DATA_DIR
+from constants import PMU_DATA_DIR
 from utils import features
+from utils.pmu_api_data import get_race_horses_records
 
 # TODO investigate driverchange column
 # TODO investigate 'engagement' column
@@ -100,10 +104,11 @@ def _create_horse_name_mapper(rh_df: pd.DataFrame) -> Dict[str, int]:
 def convert_queried_data_to_race_horse_df(
     queried_race_horse_df: pd.DataFrame,
     historical_race_horse_df: Optional[pd.DataFrame],
-)->pd.DataFrame:
+) -> pd.DataFrame:
     """Will convert queried race horse df into the right format.
 
-    If `historical_race_horse_df`is provided, the converted race/horses will be formatted as an extension of it """
+    If `historical_race_horse_df`is provided, the converted race/horses will be
+    formatted as an extension of it """
 
     race_horse_df = queried_race_horse_df
 
@@ -136,7 +141,7 @@ def convert_queried_data_to_race_horse_df(
         "oeilleres",
         "handicapDistance",
         "handicapValeur",
-        "last_race_date"
+        "last_race_date",
     ]:
         if col_name not in race_horse_df:
             race_horse_df[col_name] = np.nan
@@ -177,7 +182,7 @@ def convert_queried_data_to_race_horse_df(
     # Compute horse_id
     # TODO check unique mother/father/father_mother
 
-    mapper_dict = {}
+    mapper_dict: Dict[str, int] = {}
     max_old_race_id = -1
 
     if historical_race_horse_df is not None:
@@ -227,7 +232,7 @@ def convert_queried_data_to_race_horse_df(
         )
 
     # Compute race_id
-    mapper_dict = {}
+    mapper_dict: Dict[Tuple[dt.date, int, int], int] = {}
     max_old_race_id = -1
     if historical_race_horse_df is not None:
         horse_name_df = historical_race_horse_df[
@@ -268,8 +273,8 @@ def convert_queried_data_to_race_horse_df(
     race_horse_df["odds"] = 1 / race_horse_df["pari_mutuel_proba"]
 
     race_horse_df["duration_since_last_race"] = (
-            pd.to_datetime(race_horse_df["date"]).dt.date
-            - pd.to_datetime(race_horse_df["last_race_date"]).dt.date
+        pd.to_datetime(race_horse_df["date"]).dt.date
+        - pd.to_datetime(race_horse_df["last_race_date"]).dt.date
     )
 
     return race_horse_df

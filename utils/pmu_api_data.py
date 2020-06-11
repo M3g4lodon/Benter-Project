@@ -1,6 +1,8 @@
 import datetime as dt
 import os
-from typing import Union, Optional, List
+from typing import List
+from typing import Optional
+from typing import Union
 
 import utils
 from constants import SOURCE_PMU
@@ -14,7 +16,10 @@ def get_pmu_api_url(
     c_i: Optional[int] = None,
     code_pari: Optional[str] = None,
 ) -> str:
-    pmu_programme_api_url = f"https://online.turfinfo.api.pmu.fr/rest/client/1/programme/{date.strftime('%d%m%Y')}"
+    pmu_programme_api_url = (
+        f"https://online.turfinfo.api.pmu.fr/rest/client/1/"
+        f"programme/{date.strftime('%d%m%Y')}"
+    )
     if url_name == "PROGRAMME":
         return pmu_programme_api_url
 
@@ -28,29 +33,33 @@ def get_pmu_api_url(
 
     if url_name == "PARTICIPANTS":
         return f"{_pmu_programme_course_api_url}/participants"
-    elif url_name == "PRONOSTIC":
+    if url_name == "PRONOSTIC":
         return f"{_pmu_programme_course_api_url}/pronostics"
-    elif url_name == "PRONOSTIC_DETAILLE":
+    if url_name == "PRONOSTIC_DETAILLE":
         return f"{_pmu_programme_course_api_url}/pronostics-detailles"
-    elif url_name == "PERFORMANCE":
+    if url_name == "PERFORMANCE":
         return f"{_pmu_programme_course_api_url}/performances-detaillees/pretty"
-    elif url_name == "ENJEU":
+    if url_name == "ENJEU":
         return f"{_pmu_programme_course_api_url}/masse-enjeu-v2"
-    elif url_name == "ENJEU_INTERNET":
+    if url_name == "ENJEU_INTERNET":
         return f"{_pmu_programme_course_api_url}/masse-enjeu-v2?specialisation=INTERNET"
-    elif url_name == "CITATIONS":
+    if url_name == "CITATIONS":
         return f"{_pmu_programme_course_api_url}/citations"
-    elif url_name == "RAPPORTS_DEF":
+    if url_name == "RAPPORTS_DEF":
         return f"{_pmu_programme_course_api_url}/rapports-definitifs"
-    elif url_name == "RAPPORTS_DEF_INTERNET":
-        return f"{_pmu_programme_course_api_url}/rapports-definitifs?specialisation=INTERNET"
-    elif url_name == "COMBINAISONS":
+    if url_name == "RAPPORTS_DEF_INTERNET":
+        return (
+            f"{_pmu_programme_course_api_url}/"
+            f"rapports-definitifs?specialisation=INTERNET"
+        )
+    if url_name == "COMBINAISONS":
         return f"{_pmu_programme_course_api_url}/combinaisons"
-    elif url_name == "COMBINAISONS_INTERNET":
+    if url_name == "COMBINAISONS_INTERNET":
         return f"{_pmu_programme_course_api_url}/combinaisons?specialisation=INTERNET"
-    elif url_name == "CITATIONS_INTERNET":
+    if url_name == "CITATIONS_INTERNET":
         return f"{_pmu_programme_course_api_url}/citations?specialisation=INTERNET"
-    # TODO compare w/ or w/o specialisation on combinaisons, look at E_SIMPLE_GAGNANT vs SIMPLE_GAGNANT
+    # TODO compare w/ or w/o specialisation on combinaisons,
+    #  look at E_SIMPLE_GAGNANT vs SIMPLE_GAGNANT
 
     assert code_pari is not None
 
@@ -283,11 +292,11 @@ def get_race_horses_records(
     pari_type = "E_SIMPLE_GAGNANT" if course["hasEParis"] else "SIMPLE_GAGNANT"
 
     if should_be_on_disk:
+        suffix = (
+            "CITATIONS_INTERNET".lower() if course["hasEParis"] else "CITATIONS".lower()
+        )
         citations = utils.load_json(
-            filename=os.path.join(
-                folder_path,
-                f"R{r_i}_C{c_i}_{'CITATIONS_INTERNET'.lower() if course['hasEParis'] else 'CITATIONS'.lower()}.json",
-            )
+            filename=os.path.join(folder_path, f"R{r_i}_C{c_i}_{suffix}.json")
         )
     else:
         citations = execute_get_query(
@@ -299,17 +308,19 @@ def get_race_horses_records(
             )
         )
     num_pmu_enjeu = get_num_pmu_enjeu_from_citations(
-        citations=citations, pari_type=pari_type, num_pmu_partants=num_pmu_partants,
+        citations=citations, pari_type=pari_type, num_pmu_partants=num_pmu_partants
     )
     is_true_total_enjeu = True
 
     if len(num_pmu_partants) <= 12 and num_pmu_enjeu is None:
         if should_be_on_disk:
+            suffix = (
+                "COMBINAISONS_INTERNET".lower()
+                if course["hasEParis"]
+                else "COMBINAISONS".lower()
+            )
             combinaisons = utils.load_json(
-                filename=os.path.join(
-                    folder_path,
-                    f"R{r_i}_C{c_i}_{'COMBINAISONS_INTERNET'.lower() if course['hasEParis'] else 'COMBINAISONS'.lower()}.json",
-                )
+                filename=os.path.join(folder_path, f"R{r_i}_C{c_i}_{suffix}.json")
             )
         else:
             combinaisons = execute_get_query(
@@ -333,15 +344,14 @@ def get_race_horses_records(
         if should_be_on_disk:
             rapport_simple_gagnant = utils.load_json(
                 filename=os.path.join(
-                    folder_path, f"R{r_i}_C{c_i}_{pari_type}_{'RAPPORTS'.lower()}.json",
+                    folder_path, f"R{r_i}_C{c_i}_{pari_type}_{'RAPPORTS'.lower()}.json"
                 )
             )
-
+            suffix = (
+                "ENJEU_INTERNET".lower() if course["hasEParis"] else "ENJEU".lower()
+            )
             enjeux = utils.load_json(
-                filename=os.path.join(
-                    folder_path,
-                    f"R{r_i}_C{c_i}_{'ENJEU_INTERNET'.lower() if course['hasEParis'] else 'ENJEU'.lower()}.json",
-                )
+                filename=os.path.join(folder_path, f"R{r_i}_C{c_i}_{suffix}.json")
             )
         else:
             rapport_simple_gagnant = execute_get_query(
@@ -401,11 +411,15 @@ def get_race_horses_records(
             ][0]
         )
         race_horse["totalEnjeu"] = (
-            None if num_pmu_enjeu is None else num_pmu_enjeu.get(race_horse["numPmu"], None)
+            None
+            if num_pmu_enjeu is None
+            else num_pmu_enjeu.get(race_horse["numPmu"], None)
         )
 
         race_horse["last_race_date"] = (
-            None if last_race_date is None else last_race_date.get(race_horse["numPmu"], None)
+            None
+            if last_race_date is None
+            else last_race_date.get(race_horse["numPmu"], None)
         )
         handicap_weight = None
         if "poidsConditionMonte" in race_horse and race_horse["poidsConditionMonte"]:

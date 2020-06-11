@@ -3,12 +3,14 @@ from typing import Tuple
 import numpy as np
 from sklearn import metrics
 
-from winning_horse_models import AbstractWinningModel
 from utils import import_data
+from winning_horse_models import AbstractWinningModel
 
 
 MIN_N_EXAMPLES = 10
-# TODO compare training on all races, specialise on each n_horse races, pre train on combinaison,
+
+# TODO compare training on all races, specialise on each n_horse races,
+#  pre train on combinaison,
 
 
 def _one_hot_encode(y, n_horses: int):
@@ -116,7 +118,7 @@ def train_per_horse(
                 f"{loss_per_horse:.3f}, val loss per horse: {val_loss_per_horse:.3f} "
                 f"Train Accuracy: {accuracy:.1%}, Val Accuracy: {val_accuracy:.1%}\n"
             )
-        assert winning_model.n_horses_models[n_horses] is model
+        assert winning_model.get_n_horses_model(n_horses=n_horses) is model
     return winning_model, training_history
 
 
@@ -217,9 +219,12 @@ def train_on_each_horse_with_epochs(
             )
             if verbose:
                 print(
-                    f"Training for {n_horses} horses ({x.shape[0]} races, val {x_val.shape[0]} races): loss per horse: "
-                    f"{loss_per_horse:.3f}, val loss per horse: {val_loss_per_horse:.3f} "
-                    f"Train Accuracy: {accuracy:.1%}, Val Accuracy: {val_accuracy:.1%}\n"
+                    f"Training for {n_horses} horses ({x.shape[0]} races, "
+                    f"val {x_val.shape[0]} races): loss per horse: "
+                    f"{loss_per_horse:.3f}, val loss per horse: "
+                    f"{val_loss_per_horse:.3f} "
+                    f"Train Accuracy: {accuracy:.1%}, "
+                    f"Val Accuracy: {val_accuracy:.1%}\n"
                 )
 
         if verbose:
@@ -237,4 +242,3 @@ def train_on_all_races(
 ) -> AbstractWinningModel:
     """Only for deeplearning models (tf.keras like)
     Train on several epochs on all races, in the order of happening"""
-    pass

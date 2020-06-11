@@ -65,8 +65,6 @@ def run() -> None:
         race_horse_df.race_date_dmy + " " + race_horse_df.race_time.fillna("12h00")
     )
 
-
-
     # Odds rectification
     race_horse_df["odds"] = race_horse_df["odds"] * race_horse_df["race_id"].map(
         race_horse_df.groupby("race_id")["odds"].agg(lambda s: np.sum(1 / s))
@@ -94,7 +92,9 @@ def run() -> None:
             (race_horse_df.race_id == race_id)
             & (race_horse_df.race_datetime == max_race_datetime)
         ]
-    race_horse_df = race_horse_df[race_horse_df.race_datetime.notna()] # removing empty races
+    race_horse_df = race_horse_df[
+        race_horse_df.race_datetime.notna()
+    ]  # removing empty races
     # (because of previous operation)
 
     race_horse_df["n_horses"] = race_horse_df["race_id"].map(

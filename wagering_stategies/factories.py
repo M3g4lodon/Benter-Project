@@ -63,8 +63,8 @@ def _betting_on_best_expected_return_thresholded_winning_probabilities(
     capital_fraction: float,
     _minimum_winning_probabilities: float,
 ) -> np.array:
-    """Returns bettings putting all capital fraction on the best expected return on winning probabilities
-    above a given threshold (if it is above one)"""
+    """Returns bettings putting all capital fraction on the best expected
+    return on winning probabilities above a given threshold (if it is above one)"""
     n_horses = x_race.shape[0]
 
     y_hat_race = winning_model.predict(x=np.expand_dims(x_race, axis=0))[0, :]
@@ -101,7 +101,7 @@ def betting_on_best_expected_return_thresholded_winning_probabilities_factory(
     )
 
 
-def _betting_on_best_expected_return_thresholded_winning_probabilities_expected_returns(
+def _betting_on_best_exp_return_thresholded_winning_proba_expected_returns(
     x_race: np.array,
     previous_stakes: np.array,
     track_take: float,
@@ -110,8 +110,9 @@ def _betting_on_best_expected_return_thresholded_winning_probabilities_expected_
     _minimum_winning_probabilities: float,
     _expected_return_threshold: float,
 ) -> np.array:
-    """Returns bettings putting all capital fraction on the best expected return on winning probabilities
-    above a given threshold (if it is above a threshold on expected return and one)"""
+    """Returns bettings putting all capital fraction on the best expected return on
+    winning probabilities above a given threshold (if it is above a threshold on
+    expected return and one)"""
     n_horses = x_race.shape[0]
 
     y_hat_race = winning_model.predict(x=np.expand_dims(x_race, axis=0))[0, :]
@@ -140,11 +141,11 @@ def _betting_on_best_expected_return_thresholded_winning_probabilities_expected_
     return betting
 
 
-def betting_on_best_expected_return_thresholded_winning_probabilities_expected_returns_factory(
+def betting_on_best_exp_return_thresholded_winning_proba_expected_returns_factory(
     minimum_winning_probabilities: float, expected_return_threshold: float
 ) -> Callable:
     return functools.partial(
-        _betting_on_best_expected_return_thresholded_winning_probabilities_expected_returns,
+        _betting_on_best_exp_return_thresholded_winning_proba_expected_returns,
         _minimum_winning_probabilities=minimum_winning_probabilities,
         _expected_return_threshold=expected_return_threshold,
     )

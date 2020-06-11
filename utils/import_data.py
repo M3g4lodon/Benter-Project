@@ -2,18 +2,21 @@ import datetime as dt
 import functools
 import os
 from itertools import combinations
-from typing import Tuple, Optional, Union, Iterator
-import pytz
+from typing import Iterator
+from typing import Optional
+from typing import Tuple
 
 import numpy as np
 import pandas as pd
+import pytz
 from joblib import Memory
 
-from constants import DATA_DIR, CACHE_DIR
+from constants import CACHE_DIR
+from constants import DATA_DIR
 
 memory = Memory(location=CACHE_DIR, verbose=0)
 
-ZETURF_BEFORE_TRAIN_DATE = dt.datetime(2012, 11, 1,)
+ZETURF_BEFORE_TRAIN_DATE = dt.datetime(2012, 11, 1)
 ZETURF_BEFORE_VALIDATION_DATE = dt.datetime(2012, 12, 1)
 
 PMU_BEFORE_TRAIN_DATE = dt.datetime(2018, 1, 1, tzinfo=pytz.UTC)
@@ -88,13 +91,13 @@ def get_split_date(source: str, on_split: str) -> pd.DataFrame:
 
     if on_split == "train":
         return train_race_horse_df
-    elif on_split == "val":
+    if on_split == "val":
         return val_race_horse_df
-    else:
-        return test_race_horse_df
+    # on_split == "test"
+    return test_race_horse_df
 
 
-def extract_x_y_odds(
+def extract_x_y_odds(  # pylint:disable=too-many-branches
     race_df: pd.DataFrame,
     x_format: str,
     y_format: str,
@@ -104,7 +107,7 @@ def extract_x_y_odds(
     """For a given race in `race_df` returns features, y in the asked format and odds"""
     assert x_format in {"sequential_per_horse", "flattened"}
     assert y_format in {"first_position", "rank", "index_first"}
-    from utils import preprocess
+    from utils import preprocess  # pylint:disable=cyclic-import,import-outside-toplevel
 
     x_race = preprocess.preprocess(race_horse_df=race_df, source=source)
 
@@ -158,7 +161,8 @@ def get_races_per_horse_number(
     y_format: str,
     remove_nan_odds: bool = False,
 ) -> Tuple[np.array, np.array, np.array]:
-    """For the given source, the given split, the given number of horses per races, the given y_format,
+    """For the given source, the given split, the given number of horses per races,
+    the given y_format,
     returns numpy arrays of features, y, and odds"""
 
     rh_df = get_split_date(source=source, on_split=on_split)
@@ -166,7 +170,7 @@ def get_races_per_horse_number(
     x = []
     y = []
     odds = []
-    for race_id, race_df in rh_df[rh_df["n_horses"] == n_horses].groupby("race_id"):
+    for _, race_df in rh_df[rh_df["n_horses"] == n_horses].groupby("race_id"):
         if source == "PMU":
             race_df = race_df[race_df["statut"] == "PARTANT"]
         assert len(race_df) == n_horses
@@ -198,9 +202,9 @@ def get_dataset_races(
     yields every races (features, y, race dataframe)"""
     rh_df = get_split_date(source=source, on_split=on_split)
 
-    for race_id, race_df in rh_df.groupby("race_id"):
+    for _, race_df in rh_df.groupby("race_id"):
         x_race, y_race, _ = extract_x_y_odds(
-            race_df=race_df, source=source, x_format=x_format, y_format=y_format,
+            race_df=race_df, source=source, x_format=x_format, y_format=y_format
         )
         if any([x_race is None, y_race is None]):
             continue
@@ -252,7 +256,8 @@ def run():
             horse_to_number_combinaison[n_horse] = len(combins)
         count_per_n_horses = race_horse_df.groupby("race_id")["n_horses"].first()
         print(
-            f"Number of combinaisons {count_per_n_horses.map(horse_to_number_combinaison).sum():.2e}"
+            f"Number of combinaisons "
+            f"{count_per_n_horses.map(horse_to_number_combinaison).sum():.2e}"
         )
 
         print("Counting number of races per dataset per number of horses")

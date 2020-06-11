@@ -2,15 +2,15 @@ import datetime as dt
 import os
 import time
 
-from cachetools import func
 import pytz
-
-from utils.pmu_api_data import get_pmu_api_url
-from requests.exceptions import ConnectionError
-from utils.scrape import execute_get_query, create_day_folder
+import requests
+from cachetools import func
 
 import utils
 from constants import PMU_DATA_DIR
+from utils.pmu_api_data import get_pmu_api_url
+from utils.scrape import create_day_folder
+from utils.scrape import execute_get_query
 
 TIMEZONE = "Europe/Paris"
 # TODO scrape pronostics in real time (only available for few weeks)
@@ -26,10 +26,7 @@ def execute_queries(seconds_before: int, race_times: dict) -> int:
         if time_to_race.total_seconds() < seconds_before
     }
     for (date_, r_i, c_i), _ in candidates.items():
-        for url_name in [
-            "CITATIONS_INTERNET",
-            "CITATIONS",
-        ]:
+        for url_name in ["CITATIONS_INTERNET", "CITATIONS"]:
             day_folder_path = os.path.join(PMU_DATA_DIR, date_.isoformat())
             filename = os.path.join(
                 day_folder_path, f"{prefix}_R{r_i}_C{c_i}_{url_name.lower()}.json"
@@ -84,7 +81,8 @@ def update():
     time_to_next_race = min(coming_races.values())
     if time_to_next_race.total_seconds() > 60 * 10:
         print(
-            f"\r[{dt.datetime.now().isoformat()}] Next race in {time_to_next_race}, waiting 1 min...",
+            f"\r[{dt.datetime.now().isoformat()}] Next race in {time_to_next_race}, "
+            f"waiting 1 min...",
             end="",
         )
         time.sleep(60)
@@ -113,7 +111,7 @@ def run():
         new_queries = None
         try:
             new_queries = update()
-        except ConnectionError as e:
+        except requests.ConnectionError as e:
             retry_count += 1
             print(
                 f"\r[{start_date.isoformat()}] Connection Error n°{retry_count}: {e}",

@@ -1,0 +1,15 @@
+[flake8]
+max-line-length = 88
+# We ignore the following errors, for compatibility with Black
+# Those errors have nothing to do with PEP8, it is a known issue of flake8
+# https://github.com/psf/black/issues/315
+# https://github.com/psf/black/issues/52
+ignore = E203, W503
+exclude =
+    .git,
+    __pycache__,
+    .cache,
+    .github,
+    .mypy_cache,
+    .pytest_cache,
+    .cache_test,

@@ -5,7 +5,8 @@ import os
 import requests
 
 import utils
-from constants import PMU_DATA_DIR, UNIBET_DATA_DIR
+from constants import PMU_DATA_DIR
+from constants import UNIBET_DATA_DIR
 
 
 def execute_get_query(url: str) -> dict:
@@ -21,7 +22,7 @@ def execute_get_query(url: str) -> dict:
             res.update({"note": "application error"})
             return res
         except json.decoder.JSONDecodeError as e:
-            res.update({"note": "server error, no json"})
+            res.update({"note": f"server error, no json ({e})"})
             return res
 
     if response.status_code == 204:

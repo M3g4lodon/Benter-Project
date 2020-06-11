@@ -1,11 +1,13 @@
-from typing import Callable, Optional
+from typing import Callable
+from typing import Optional
 
 import numpy as np
 from scipy.stats import stats
 
-from winning_horse_models import AbstractWinningModel, ModelNotCreatedOnceError
-from winning_horse_models.baselines import RandomModel
 from utils import import_data
+from winning_horse_models import AbstractWinningModel
+from winning_horse_models import ModelNotCreatedOnceError
+from winning_horse_models.baselines import RandomModel
 
 
 # TODO error on unseen horses
@@ -37,9 +39,7 @@ def kappa_cohen_like(rank_race, rank_hat, k: Optional[int] = None):
 
 
 # Predicted Proba of actual race results
-def compute_rank_proba(
-    rank_race: np.array, k: int, proba_distribution: np.array,
-):
+def compute_rank_proba(rank_race: np.array, k: int, proba_distribution: np.array):
 
     if proba_distribution.size == 0:
         return np.nan
@@ -109,34 +109,41 @@ def compute_validation_error(
             res["n_horses_validations"][n_horses] = {"message": "Model was not created"}
             continue
 
-        y_random = RandomModel().predict(x=x_race)
-
-        rank_hat = np.apply_along_axis(
-            lambda x: stats.rankdata(a=-x, method="min"), arr=y_hat, axis=1
-        )
-        rank_random = np.apply_along_axis(
-            lambda x: stats.rankdata(a=-x, method="min"), arr=y_random, axis=1
-        )
-        rank_odds = np.apply_along_axis(
-            lambda x: stats.rankdata(a=x, method="min"), arr=odds_race, axis=1
-        )
-
         topk_arr = np.array(
             [
-                validation_method(rank_r, rank_h, k=k)
-                for rank_r, rank_h in zip(rank_race, rank_hat)
+                validation_method(rank_race=rank_r, rank_hat=rank_h, k=k)
+                for rank_r, rank_h in zip(
+                    rank_race,
+                    np.apply_along_axis(
+                        lambda x: stats.rankdata(a=-x, method="min"), arr=y_hat, axis=1
+                    ),
+                )
             ]
         )
         random_topk_arr = np.array(
             [
                 validation_method(rank_r, rank_h, k=k)
-                for rank_r, rank_h in zip(rank_race, rank_random)
+                for rank_r, rank_h in zip(
+                    rank_race,
+                    np.apply_along_axis(
+                        lambda x: stats.rankdata(a=-x, method="min"),
+                        arr=RandomModel().predict(x=x_race),
+                        axis=1,
+                    ),
+                )
             ]
         )
         odds_topk_arr = np.array(
             [
                 validation_method(rank_r, rank_h, k=k)
-                for rank_r, rank_h in zip(rank_race, rank_odds)
+                for rank_r, rank_h in zip(
+                    rank_race,
+                    np.apply_along_axis(
+                        lambda x: stats.rankdata(a=x, method="min"),
+                        arr=odds_race,
+                        axis=1,
+                    ),
+                )
             ]
         )
 
@@ -229,17 +236,21 @@ def compute_predicted_proba_on_actual_races(
 
         if not race_odds_notna_index.all() and not same_races_support:
             print(
-                f"[Be careful, only {race_odds_notna_index.sum()} races ({race_odds_notna_index.mean():.2%}) are kept "
-                f"in odds analysis for {n_horses} horses, ({x_race.shape[0]} races in total)]"
+                f"[Be careful, only {race_odds_notna_index.sum()} races "
+                f"({race_odds_notna_index.mean():.2%}) are kept "
+                f"in odds analysis for {n_horses} horses, ({x_race.shape[0]} "
+                f"races in total)]"
             )
         if same_races_support and not race_odds_notna_index.all():
             print(
-                f"Comparing on same races w/ {n_horses} horses with odds {np.sum(race_odds_notna_index)} "
+                f"Comparing on same races w/ {n_horses} horses with odds "
+                f"{np.sum(race_odds_notna_index)} "
                 f"races ({x_race.shape[0]} races in total)"
             )
         if race_odds_notna_index.all():
             print(
-                f"Comparing on all races w/ {n_horses} horses ({x_race.shape[0]} races in total)"
+                f"Comparing on all races w/ {n_horses} horses "
+                f"({x_race.shape[0]} races in total)"
             )
         odds_predicted_probas = np.array(
             [
@@ -248,15 +259,17 @@ def compute_predicted_proba_on_actual_races(
             ]
         )
 
-        res[n_horses] = {
+        res["n_horses_predicted_probas"][n_horses] = {
             "predicted_probabilities": predicted_probas,
             "random_probabilities": random_predicted_probas,
             "odds_probabilities": odds_predicted_probas,
             "race_odds_notna_index": race_odds_notna_index,
         }
         print(
-            f"Mean Predicted probas of actual race result: {predicted_probas.mean():.3%} "
-            f"(Random: {random_predicted_probas.mean():.3%}, Odds: {odds_predicted_probas.mean():.3%})"
+            f"Mean Predicted probas of actual race result: "
+            f"{predicted_probas.mean():.3%} "
+            f"(Random: {random_predicted_probas.mean():.3%}, "
+            f"Odds: {odds_predicted_probas.mean():.3%})"
         )
         print()
 

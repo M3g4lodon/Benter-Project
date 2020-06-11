@@ -18,4 +18,3 @@ Inspired by this Bloomberg [article](https://www.bloomberg.com/news/features/201
 |Winning Horse Model|logistic regression SGD, baselines, skleanrn,|sequential MLP, MLP, transformer, dimension reduction technique|
 |Wagering strategy  |Kelly,Most Expected return, baselines, factories| |
 |Real time betting  |Real time suggestion   |Real time betting directly on PMU |
-

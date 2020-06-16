@@ -1,3 +1,4 @@
+import itertools
 from typing import Callable
 
 import matplotlib.pyplot as plt
@@ -7,12 +8,14 @@ import seaborn as sns
 from tqdm import tqdm
 
 from constants import PMU_BETTINGS
+from constants import PMU_MINIMUM_BET_SIZE
 from utils import import_data
 from utils.expected_return import get_race_odds
 from wagering_stategies import race_betting_proportional_positive_return
 from winning_horse_models import AbstractWinningModel
 
-initial_capital = 100 * 100  # 100.00€
+START_CAPITAL = 100 * 100  # 100.00€
+DEFAULT_BET_SIZE = PMU_MINIMUM_BET_SIZE * 10
 
 # TODO add more stat (max drawdown, look at master thesis, max number of losses,
 #  expexted return, return distribution,
@@ -27,9 +30,12 @@ def compute_expected_return(
     source: str,
     code_pari: str,
     winning_model: AbstractWinningModel,
+    bet_size: float = DEFAULT_BET_SIZE,
 ) -> pd.DataFrame:
     """For each races, compute expected return (1 basis)
     Without taking into account the feedback effect"""
+    assert bet_size > PMU_MINIMUM_BET_SIZE
+
     track_take = [betting for betting in PMU_BETTINGS if betting.name == code_pari][0][
         1
     ]
@@ -59,7 +65,13 @@ def compute_expected_return(
         assert np.sum(betting_race) >= 0 or np.isclose(np.sum(betting_race), 0.0)
         assert np.sum(betting_race) <= 1 or np.isclose(np.sum(betting_race), 1.0)
 
-        actual_betting = np.round(betting_race)
+        actual_betting = betting_race * bet_size
+        actual_betting = np.where(
+            actual_betting < PMU_MINIMUM_BET_SIZE,
+            np.zeros_like(actual_betting),
+            np.round(actual_betting),
+        )
+
         expected_return = np.where(
             y_race == 1,
             get_race_odds(
@@ -69,10 +81,15 @@ def compute_expected_return(
             ),
             np.zeros_like(actual_betting),
         ).sum() - np.sum(actual_betting)
+        relative_expected_return = expected_return / np.sum(actual_betting)
         records.append(
             {
-                "sum_betting": actual_betting.sum(),
+                "betting_fraction": betting_race.sum(),
+                "bet_size": actual_betting.sum(),
                 "expected_return": expected_return,
+                "relative_expected_return": relative_expected_return,
+                "computed_bets_on_n_horses": np.sum(betting_race > 0.0),
+                "actual_bets_on_n_horses": np.sum(actual_betting > 0.0),
                 "n_horse": x_race.shape[0],
                 "date": race_df["date"].iloc[0],
                 "race_id": race_df["race_id"].iloc[0],
@@ -80,6 +97,92 @@ def compute_expected_return(
         )
 
     return pd.DataFrame.from_records(records)
+
+
+def plot_expected_return(expected_return_df: pd.DataFrame) -> None:
+    # TODO streak per day/month
+    # TODO look at computed_bets_on_n_horses, actual_bets_on_n_horses
+    print(
+        f"On all races, your expected return is "
+        f"{expected_return_df.relative_expected_return.mean():+.2%} "
+        f"(std: {expected_return_df.relative_expected_return.std():.1f})"
+    )
+
+    print(
+        f"You bet {(expected_return_df.bet_size > 0).mean():.2%} of the time "
+        f"({(expected_return_df.bet_size > 0).sum():.0f} out of"
+        f" {len(expected_return_df):.0f} races)"
+    )
+
+    not_betting_streaks = [
+        sum(1 for _ in grouper_)
+        for is_betting, grouper_ in itertools.groupby(expected_return_df.bet_size > 0)
+        if not is_betting
+    ]
+    if not_betting_streaks:
+        print(f"Average not betting streaks: {np.mean(not_betting_streaks):.2f} races")
+    else:
+        print("No races without bettings!")
+    betting_expected_return = expected_return_df[expected_return_df.bet_size > 0]
+    print(
+        f"When you bet, on average your expected return is "
+        f"{betting_expected_return.relative_expected_return.mean():+.2%} "
+        f"(std: {betting_expected_return.relative_expected_return.std():.1f})"
+    )
+
+    print(
+        f"When you bet, you win "
+        f"{(betting_expected_return.relative_expected_return > 0).mean():.2%} "
+        f"of the time "
+        f"({(betting_expected_return.relative_expected_return > 0).sum():.0f} out of "
+        f"{len(betting_expected_return):.0f} bets)"
+    )
+    print(
+        f"When you bet, you lose "
+        f"{(betting_expected_return.relative_expected_return < 0).mean():.2%} "
+        f"of the time"
+        f"({(betting_expected_return.relative_expected_return < 0).sum():.0f} out of "
+        f"{len(betting_expected_return):.0f} bets)"
+    )
+
+    winning_expected_return = expected_return_df[
+        (expected_return_df.relative_expected_return > 0)
+    ]
+    if not winning_expected_return.empty:
+        print(
+            "When you bet&win, you make "
+            f"{winning_expected_return.relative_expected_return.mean():+.2%} ("
+            f"std: {winning_expected_return.relative_expected_return.std():.1f})"
+        )
+    else:
+        print("Not winning any bets!")
+
+    win_streaks = [
+        (is_winning, sum(1 for _ in grouper_))
+        for is_winning, grouper_ in itertools.groupby(
+            betting_expected_return.expected_return > 0
+        )
+    ]
+
+    winning_streaks = [
+        streak_length for is_winning, streak_length in win_streaks if is_winning
+    ]
+    losing_streaks = [
+        streak_length for is_winning, streak_length in win_streaks if not is_winning
+    ]
+    if losing_streaks:
+        print(
+            f"While betting, Average losing streaks {np.mean(losing_streaks)} "
+            f"(std: {np.std(losing_streaks):.1f})"
+        )
+        print(f"While betting, Longest losing streak: {np.max(losing_streaks):.0f}")
+    else:
+        print("There is no losing streaks!")
+
+    if winning_streaks:
+        print(f"While betting, Longest winning streak: {np.max(winning_streaks):.0f}")
+    else:
+        print("There is no winning streaks!")
 
 
 def compute_scenario(
@@ -94,7 +197,7 @@ def compute_scenario(
         1
     ]
     np.random.seed(42)
-    capital_value = initial_capital
+    capital_value = START_CAPITAL
     records = []
     n_races = import_data.get_n_races(
         source=source, on_split="val", remove_nan_previous_stakes=True
@@ -124,6 +227,11 @@ def compute_scenario(
         assert np.sum(betting_race) <= 1 or np.isclose(np.sum(betting_race), 1.0)
 
         actual_betting = np.round(betting_race * capital_value)
+        actual_betting = np.where(
+            actual_betting < PMU_MINIMUM_BET_SIZE,
+            np.zeros_like(actual_betting),
+            np.round(actual_betting),
+        )
 
         capital_value_old = capital_value
         capital_value += np.where(
@@ -151,7 +259,7 @@ def compute_scenario(
     return pd.DataFrame.from_records(records)
 
 
-def plot_scenario(scenario_df: pd.DataFrame):
+def plot_scenario(scenario_df: pd.DataFrame) -> None:
     scenario_df["#_races"] = scenario_df.index.to_series()
     ax = sns.lineplot(data=scenario_df, x="#_races", y="Capital")
     ax.set(yscale="log")

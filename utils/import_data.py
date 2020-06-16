@@ -188,7 +188,11 @@ def get_races_per_horse_number(
         y.append(y_race)
         odds.append(odds_race)
 
-    return np.array(x), np.array(y), np.array(odds)
+    return (
+        np.asarray(x).astype(np.float32),
+        np.asarray(y).astype(np.float32),
+        np.asarray(odds).astype(np.float32),
+    )
 
 
 def get_dataset_races(
@@ -210,7 +214,11 @@ def get_dataset_races(
             continue
         if np.any(np.isnan(race_df["totalEnjeu"])) and remove_nan_previous_stakes:
             continue
-        yield x_race, y_race, race_df
+        yield (
+            np.asarray(x_race).astype(np.float32),
+            np.asarray(y_race).astype(np.float32),
+            race_df,
+        )
 
 
 @memory.cache

@@ -89,6 +89,7 @@ def race_bettings_kelly(
     """
     y_hat_race = winning_model.predict(x=np.expand_dims(x_race, axis=0))[0, :]
 
+    # Race odds, with little adjustment when no bets has been put on a horse
     odds_race = np.where(
         previous_stakes > 0,
         previous_stakes.sum() / previous_stakes,
@@ -113,10 +114,9 @@ def race_bettings_kelly(
     if not S:
         return np.zeros_like(y_hat_race)
 
-    race_f = np.clip(
+    return np.clip(
         (expected_return_race - R_S) / (1 - track_take) / odds_race, a_min=0, a_max=None
     )
-    return race_f
 
 
 def race_betting_proportional_winning_proba(

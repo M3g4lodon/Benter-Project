@@ -1,8 +1,13 @@
 import datetime as dt
 import os
+from typing import Dict
 from typing import List
 from typing import Optional
+from typing import Tuple
 from typing import Union
+
+import numpy as np
+import pandas as pd
 
 import utils
 from constants import SOURCE_PMU
@@ -471,3 +476,207 @@ def get_race_horses_records(
         )
 
     return race_horses
+
+
+def convert_queried_data_to_race_horse_df(
+    queried_race_horse_df: pd.DataFrame,
+    historical_race_horse_df: Optional[pd.DataFrame],
+) -> pd.DataFrame:
+    """Will convert queried race horse df into the right format.
+
+    If `historical_race_horse_df`is provided, the converted race/horses will be
+    formatted as an extension of it """
+
+    race_horse_df = queried_race_horse_df
+
+    for col_name in ["date", "n_reunion", "n_course", "statut", "totalEnjeu"]:
+        assert col_name in race_horse_df, f"{col_name} column is missing race_horse_df"
+
+    for col_name in [
+        "nom",
+        "nomPere",
+        "nomMere",
+        "nomPereMere",
+        "sexe",
+        "numPmu",
+        "driver",
+        "age",
+        "race",
+        "jumentPleine",
+        "entraineur",
+        "proprietaire",
+        "eleveur",
+        "ordreArrivee",
+        "nombreCourses",
+        "nombreVictoires",
+        "nombrePlaces",
+        "deferre",
+        "tempsObtenu",
+        "gainsAnneeEnCours",
+        "gainsAnneePrecedente",
+        "gainsCarriere",
+        "oeilleres",
+        "handicapDistance",
+        "handicapValeur",
+        "last_race_date",
+    ]:
+        if col_name not in race_horse_df:
+            race_horse_df[col_name] = np.nan
+
+    columns_renaming = {
+        "nom": "horse_name",
+        "nomPere": "father_horse_name",
+        "nomMere": "mother_horse_name",
+        "nomPereMere": "father_mother_horse_name",
+        "sexe": "horse_sex",
+        "numPmu": "horse_number",
+        "driver": "jockey_name",
+        "age": "horse_age",
+        "race": "horse_race",
+        "jumentPleine": "is_pregnant",
+        "entraineur": "trainer_name",
+        "proprietaire": "owner_name",
+        "eleveur": "breeder_name",
+        "ordreArrivee": "horse_place",
+        "nombreCourses": "n_run_races",
+        "nombreVictoires": "n_won_races",
+        "nombrePlaces": "n_placed_races",
+        "deferre": "unshod",
+        "tempsObtenu": "horse_race_duration",
+        "gainsAnneeEnCours": "horse_current_year_prize",
+        "gainsAnneePrecedente": "horse_last_year_prize",
+        "gainsCarriere": "horse_career_prize",
+        "oeilleres": "blinkers",
+        "handicapDistance": "handicap_distance",
+        "handicapValeur": "handicap_value",
+    }
+    race_horse_df = queried_race_horse_df.rename(columns=columns_renaming)
+
+    race_horse_df[race_horse_df["unshod"] == "REFERRE_ANTERIEURS_POSTERIEURS"][
+        "unshod"
+    ] = np.nan
+
+    # Compute horse_id
+    # TODO check unique mother/father/father_mother
+
+    horse_id_mapper_dict: Dict[str, int] = {}
+    max_old_race_id = -1
+
+    if historical_race_horse_df is not None:
+        for col in ["horse", "father_horse", "mother_horse", "father_mother_horse"]:
+            col_id = f"{col}_id"
+            col_name = f"{col}_name"
+            horse_name_df = historical_race_horse_df[
+                [col_id, col_name]
+            ].drop_duplicates()
+            horse_name_df.dropna(inplace=True)
+            horse_name_df[col_name] = horse_name_df[col_name].str.upper()
+            horse_name_df.drop_duplicates(inplace=True)
+            horse_id_mapper_dict.update(
+                horse_name_df.set_index(col_name)[col_id].to_dict()
+            )
+
+        max_old_race_id = max(horse_id_mapper_dict.values())
+
+    horse_id_mapper_dict.update(
+        {
+            horse_name: index + max_old_race_id + 1
+            for horse_name, index in _create_horse_name_mapper(
+                rh_df=race_horse_df
+            ).items()
+            if horse_name not in horse_id_mapper_dict
+        }
+    )
+
+    race_horse_df["horse_id"] = (
+        race_horse_df["horse_name"]
+        .str.upper()
+        .map(horse_id_mapper_dict, na_action="ignore")
+    )
+    race_horse_df["father_horse_id"] = (
+        race_horse_df["father_horse_name"]
+        .str.upper()
+        .map(horse_id_mapper_dict, na_action="ignore")
+    )
+    race_horse_df["mother_horse_id"] = (
+        race_horse_df["mother_horse_name"]
+        .str.upper()
+        .map(horse_id_mapper_dict, na_action="ignore")
+    )
+    if race_horse_df["father_mother_horse_name"].isna().all():
+        race_horse_df["father_mother_horse_id"] = np.nan
+    else:
+        race_horse_df["father_mother_horse_id"] = (
+            race_horse_df["father_mother_horse_name"]
+            .str.upper()
+            .map(horse_id_mapper_dict, na_action="ignore")
+        )
+
+    # Compute race_id
+    race_id_mapper_dict: Dict[Tuple[dt.date, int, int], int] = {}
+    max_old_race_id = -1
+    if historical_race_horse_df is not None:
+        horse_name_df = historical_race_horse_df[
+            ["date", "n_reunion", "n_course", "race_id"]
+        ].drop_duplicates()
+        horse_name_df.dropna(inplace=True)
+        race_id_mapper_dict.update(
+            horse_name_df.set_index(["date", "n_reunion", "n_course"])[
+                "race_id"
+            ].to_dict()
+        )
+
+        max_old_race_id = max(race_id_mapper_dict.values())
+
+    drc_df = race_horse_df[["date", "n_reunion", "n_course"]]
+    mapper_df = drc_df.drop_duplicates().reset_index(drop=True)
+    race_id_mapper_dict.update(
+        {
+            (row.date, row.n_reunion, row.n_course): index + max_old_race_id + 1
+            for index, row in mapper_df.iterrows()
+            if (row.date, row.n_reunion, row.n_course) not in race_id_mapper_dict
+        }
+    )
+    race_horse_df["race_id"] = [
+        race_id_mapper_dict[drc] for drc in drc_df.itertuples(index=False)
+    ]
+    race_horse_df["n_horses"] = race_horse_df["race_id"].map(
+        race_horse_df.groupby("race_id")["statut"].agg(lambda s: (s == "PARTANT").sum())
+    )
+
+    # Compute odds and pari_mutuel_proba
+    race_horse_df["totalEnjeu"] = race_horse_df["totalEnjeu"]  # in cents
+    sum_per_race = race_horse_df.groupby("race_id")["totalEnjeu"].sum()
+
+    race_horse_df["pari_mutuel_proba"] = race_horse_df["totalEnjeu"] / race_horse_df[
+        "race_id"
+    ].map(sum_per_race)
+    race_horse_df["odds"] = 1 / race_horse_df["pari_mutuel_proba"]
+
+    race_horse_df["duration_since_last_race"] = (
+        pd.to_datetime(race_horse_df["date"]).dt.date
+        - pd.to_datetime(race_horse_df["last_race_date"]).dt.date
+    )
+
+    return race_horse_df
+
+
+def _create_horse_name_mapper(rh_df: pd.DataFrame) -> Dict[str, int]:
+    assert "horse_name" in rh_df
+    assert "father_horse_name" in rh_df
+    assert "mother_horse_name" in rh_df
+    assert "father_mother_horse_name" in rh_df
+
+    horse_names = rh_df["horse_name"].append(
+        (
+            rh_df["father_horse_name"],
+            rh_df["mother_horse_name"],
+            rh_df["father_mother_horse_name"],
+        )
+    )
+    horse_names = horse_names.str.upper()
+    horse_names.dropna(inplace=True)
+    horse_names = pd.Series(horse_names.unique())
+    horse_names.name = "horse_name"
+    mapper_df = horse_names.reset_index().set_index("horse_name")
+    return mapper_df.to_dict()["index"]

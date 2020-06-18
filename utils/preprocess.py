@@ -122,7 +122,7 @@ def preprocess(race_horse_df: pd.DataFrame, source: str) -> pd.DataFrame:
             features_df[numerical_feature]
             - standard_scaler_parameters[numerical_feature]["mean"]
         ) / standard_scaler_parameters[numerical_feature]["std"]
-        features_df[numerical_feature] = features_df[numerical_feature].fillna(0)
+        features_df[numerical_feature].fillna(0, inplace=True)
 
     for ohe_feature in TO_ONE_HOT_ENCODE_COLUMNS:
         for value in ohe_features_values[ohe_feature]:

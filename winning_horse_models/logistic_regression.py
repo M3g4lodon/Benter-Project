@@ -8,14 +8,15 @@ from constants import SAVED_MODELS_DIR
 from constants import SOURCE_PMU
 from utils import preprocess
 from winning_horse_models import AbstractWinningModel
+from winning_horse_models import SequentialMixin
 
 N_FEATURES = preprocess.get_n_preprocessed_feature_columns(source=SOURCE_PMU)
 
 
-class LogisticRegressionModel(AbstractWinningModel):
+class LogisticRegressionModel(SequentialMixin, AbstractWinningModel):
     def __init__(self):
+        super().__init__()
         self.shared_layer = tf.keras.layers.Dense(1, name="shared_layer")
-        self.n_horses_models = {}
 
     def _create_n_horses_model(self, n_horses: int):
         inputs = tf.keras.Input(shape=(n_horses, N_FEATURES))
@@ -35,18 +36,6 @@ class LogisticRegressionModel(AbstractWinningModel):
         )
         model.build(input_shape=(None, n_horses, N_FEATURES))
         return model
-
-    def get_n_horses_model(self, n_horses: int):
-        if n_horses not in self.n_horses_models:
-            self.n_horses_models[n_horses] = self._create_n_horses_model(
-                n_horses=n_horses
-            )
-
-        return self.n_horses_models[n_horses]
-
-    def predict(self, x: np.array):
-        model = self.get_n_horses_model(n_horses=x.shape[1])
-        return model.predict(x=x)
 
     def save_model(self) -> None:
         if self.__class__.__name__ not in os.listdir(SAVED_MODELS_DIR):

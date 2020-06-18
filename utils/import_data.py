@@ -2,7 +2,7 @@ import datetime as dt
 import functools
 import os
 from itertools import combinations
-from typing import Iterator
+from typing import List
 from typing import Optional
 from typing import Tuple
 
@@ -97,13 +97,13 @@ def get_split_date(source: str, on_split: str) -> pd.DataFrame:
     return test_race_horse_df
 
 
-def extract_x_y_odds(  # pylint:disable=too-many-branches
+def extract_x_y(  # pylint:disable=too-many-branches
     race_df: pd.DataFrame,
     x_format: str,
     y_format: str,
     source: str,
     ignore_y: bool = False,
-) -> Tuple[Optional[np.array], Optional[np.array], Optional[np.array]]:
+) -> Tuple[Optional[np.array], Optional[np.array]]:
     """For a given race in `race_df` returns features, y in the asked format and odds"""
     assert x_format in {"sequential_per_horse", "flattened"}
     assert y_format in {"first_position", "rank", "index_first"}
@@ -112,11 +112,11 @@ def extract_x_y_odds(  # pylint:disable=too-many-branches
     x_race = preprocess.preprocess(race_horse_df=race_df, source=source)
 
     if pd.isnull(x_race).mean().mean() > MAX_NAN_PROP:
-        return None, None, None
+        return None, None
 
     # If there is at least one horse features full of nan
     if pd.isnull(x_race).all().any():
-        return None, None, None
+        return None, None
 
     x_race = x_race.values
 
@@ -124,7 +124,7 @@ def extract_x_y_odds(  # pylint:disable=too-many-branches
         x_race = x_race.flatten(order="F")
 
     if race_df["horse_place"].isna().all() and not ignore_y:
-        return None, None, None
+        return None, None
     if ignore_y:
         y_race = np.empty(shape=(x_race.shape[0]))
         y_race[:] = np.NaN
@@ -133,7 +133,7 @@ def extract_x_y_odds(  # pylint:disable=too-many-branches
         if y_format == "first_position":
             y_race = (race_df.horse_place == 1).values
             if y_race.sum() == 0:
-                return None, None, None
+                return None, None
             assert y_race.sum() > 0
             y_race = y_race / y_race.sum()  # Beware that ExAequo is possible
         elif y_format == "rank":
@@ -145,11 +145,11 @@ def extract_x_y_odds(  # pylint:disable=too-many-branches
             candidates = (race_df.horse_place == 1).values
             if np.sum(candidates) == 0:
                 # no winner in this race
-                return None, None, None
+                return None, None
             y_race = np.argwhere(candidates)[0][0]
         assert not np.any(np.isnan(y_race))
 
-    return x_race, y_race, race_df["odds"].values
+    return x_race, y_race
 
 
 @memory.cache
@@ -160,7 +160,7 @@ def get_races_per_horse_number(
     x_format: str,
     y_format: str,
     remove_nan_odds: bool = False,
-) -> Tuple[np.array, np.array, np.array]:
+) -> Tuple[np.array, np.array, List[pd.DataFrame]]:
     """For the given source, the given split, the given number of horses per races,
     the given y_format,
     returns numpy arrays of features, y, and odds"""
@@ -169,56 +169,62 @@ def get_races_per_horse_number(
 
     x = []
     y = []
-    odds = []
+    race_dfs = []
     for _, race_df in rh_df[rh_df["n_horses"] == n_horses].groupby("race_id"):
         if source == "PMU":
             race_df = race_df[race_df["statut"] == "PARTANT"]
         assert len(race_df) == n_horses
 
-        x_race, y_race, odds_race = extract_x_y_odds(
+        x_race, y_race = extract_x_y(
             race_df=race_df, x_format=x_format, y_format=y_format, source=source
         )
-        if any([x_race is None, y_race is None, odds_race is None]):
+        if any([x_race is None, y_race is None]):
             continue
 
-        if remove_nan_odds and np.any(np.isnan(odds_race)):
+        if remove_nan_odds and np.any(np.isnan(race_df["odds"].values)):
             continue
 
         x.append(x_race)
         y.append(y_race)
-        odds.append(odds_race)
+        race_dfs.append(race_df)
 
     return (
         np.asarray(x).astype(np.float32),
         np.asarray(y).astype(np.float32),
-        np.asarray(odds).astype(np.float32),
+        race_dfs,
     )
 
 
+@memory.cache
 def get_dataset_races(
     source: str,
     on_split: str,
     x_format: str,
     y_format: str,
     remove_nan_previous_stakes: bool = False,
-) -> Iterator[Tuple[np.array, np.array, pd.DataFrame]]:
+) -> List[Tuple[np.array, np.array, pd.DataFrame]]:
     """For the given data source, the given split, the given y_format,
-    yields every races (features, y, race dataframe)"""
+    returns list of every races (features, y, race dataframe)"""
+
     rh_df = get_split_date(source=source, on_split=on_split)
 
+    res = []
     for _, race_df in rh_df.groupby("race_id"):
-        x_race, y_race, _ = extract_x_y_odds(
+        x_race, y_race = extract_x_y(
             race_df=race_df, source=source, x_format=x_format, y_format=y_format
         )
         if any([x_race is None, y_race is None]):
             continue
         if np.any(np.isnan(race_df["totalEnjeu"])) and remove_nan_previous_stakes:
             continue
-        yield (
-            np.asarray(x_race).astype(np.float32),
-            np.asarray(y_race).astype(np.float32),
-            race_df,
+        res.append(
+            (
+                np.asarray(x_race).astype(np.float32),
+                np.asarray(y_race).astype(np.float32),
+                race_df,
+            )
         )
+    return res
 
 
 @memory.cache

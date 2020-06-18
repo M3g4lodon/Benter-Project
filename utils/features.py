@@ -135,3 +135,8 @@ def append_features(
 
     res = race_horse_df.join(pd.DataFrame(records).set_index("Index"))
     return res
+
+
+def check_df(featured_race_horse_df: pd.DataFrame):
+    assert not featured_race_horse_df["odds"].isna().all()
+    assert not featured_race_horse_df["totalEnjeu"].isna().all()

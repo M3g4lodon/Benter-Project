@@ -9,9 +9,9 @@ from tabulate import tabulate
 import wagering_stategies
 from constants import PMU_BETTINGS
 from constants import SOURCE_PMU
-from scripts.generate_pmu_data import convert_queried_data_to_race_horse_df
 from utils import features
 from utils import import_data
+from utils.pmu_api_data import convert_queried_data_to_race_horse_df
 from utils.pmu_api_data import get_pmu_api_url
 from utils.pmu_api_data import get_race_horses_records
 from utils.scrape import execute_get_query
@@ -74,7 +74,7 @@ def get_race_df(
 def append_bettings_to_race_df(
     race_df: pd.DataFrame, winning_model: AbstractWinningModel, track_take: float
 ) -> pd.DataFrame:
-    x_race, _, odds_race = import_data.extract_x_y_odds(
+    x_race, _ = import_data.extract_x_y(
         race_df=race_df,
         source=SOURCE_PMU,
         x_format="sequential_per_horse",
@@ -82,6 +82,7 @@ def append_bettings_to_race_df(
         ignore_y=True,
     )
 
+    odds_race = race_df["odds"].values
     y_hat_race = winning_model.predict(x=np.expand_dims(x_race, axis=0))[0, :]
 
     expected_return_race = y_hat_race * odds_race * (1 - track_take)

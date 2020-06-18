@@ -21,8 +21,6 @@ DEFAULT_BET_SIZE = PMU_MINIMUM_BET_SIZE * 10
 #  expexted return, return distribution,
 #  standard deviation of returns, EDA on returns to find bias,
 #  expected winning proba, average length of loss streak...)
-# TODO mininum betting of 150 (1.5€)
-# TODO add feedback effect of betting
 
 
 def compute_expected_return(
@@ -54,6 +52,7 @@ def compute_expected_return(
         leave=False,
         total=n_races,
     ):
+        # TODO get races per n_horses and sort the result dataframe
         betting_race = compute_betting_fun(
             x_race=x_race,
             previous_stakes=race_df["totalEnjeu"],

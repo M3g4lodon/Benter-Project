@@ -1,36 +1,17 @@
 import os
 import re
-from typing import Dict
 
-import numpy as np
 from xgboost import XGBClassifier
 from xgboost.core import XGBoostError
 
 from constants import SAVED_MODELS_DIR
 from winning_horse_models import AbstractWinningModel
-from winning_horse_models import ModelNotCreatedOnceError
+from winning_horse_models import FlattenMixin
 
 
-class XGBoostWinningModel(AbstractWinningModel):
-    def __init__(self):
-        self.n_horses_models: Dict[int, XGBClassifier] = {}
-
-    def get_n_horses_model(
-        self, n_horses: int, should_be_fitted: bool = False
-    ) -> XGBClassifier:
-        if n_horses not in self.n_horses_models and should_be_fitted:
-            raise ModelNotCreatedOnceError
-        if n_horses not in self.n_horses_models:
-            self.n_horses_models[n_horses] = XGBClassifier()
-
-        model = self.n_horses_models[n_horses]
-        return model
-
-    def predict(self, x: np.array) -> np.array:
-        model = self.get_n_horses_model(n_horses=x.shape[1], should_be_fitted=True)
-        return model.predict_proba(
-            np.reshape(a=x, newshape=(x.shape[0], x.shape[1] * x.shape[2]), order="F")
-        )
+class XGBoostWinningModel(FlattenMixin, AbstractWinningModel):
+    def _create_n_horses_model(self, n_horses: int):
+        return XGBClassifier()
 
     def save_model(self) -> None:
         if self.__class__.__name__ not in os.listdir(SAVED_MODELS_DIR):

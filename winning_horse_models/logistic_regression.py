@@ -14,6 +14,9 @@ N_FEATURES = preprocess.get_n_preprocessed_feature_columns(source=SOURCE_PMU)
 
 
 class LogisticRegressionModel(SequentialMixin, AbstractWinningModel):
+
+    _NotFittedModelError = Exception("This exception should not be triggered")
+
     def __init__(self):
         super().__init__()
         self.shared_layer = tf.keras.layers.Dense(1, name="shared_layer")
@@ -56,7 +59,7 @@ class LogisticRegressionModel(SequentialMixin, AbstractWinningModel):
             json.dump(obj=shared_layer, fp=fp)
 
     @classmethod
-    def load_model(cls, trainable: bool) -> "LogisticRegressionModel":
+    def load_model(cls) -> "LogisticRegressionModel":
         with open(
             os.path.join(SAVED_MODELS_DIR, cls.__name__, "shared_weights.json"), "r"
         ) as fp:
@@ -66,9 +69,7 @@ class LogisticRegressionModel(SequentialMixin, AbstractWinningModel):
             np.array(shared_layer_json["bias"]),
         ]
 
-        shared_layer = tf.keras.layers.Dense(
-            1, name="shared_layer", trainable=trainable
-        )
+        shared_layer = tf.keras.layers.Dense(1, name="shared_layer", trainable=True)
         shared_layer.build(input_shape=(N_FEATURES,))
         shared_layer.set_weights(baseline_weights)
 

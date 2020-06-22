@@ -5,6 +5,9 @@ from winning_horse_models import SequentialMixin
 
 
 class RandomModel(SequentialMixin, AbstractWinningModel):
+
+    _NotFittedModelError = Exception("This exception should not be triggered")
+
     def _create_n_horses_model(self, n_horses: int):
         class RandomBaseline:
             def __init__(self, n_horses: int):
@@ -26,5 +29,5 @@ class RandomModel(SequentialMixin, AbstractWinningModel):
         pass
 
     @classmethod
-    def load_model(cls, trainable: bool) -> "RandomModel":
+    def load_model(cls) -> "RandomModel":
         return RandomModel()

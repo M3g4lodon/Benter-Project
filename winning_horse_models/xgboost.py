@@ -1,6 +1,7 @@
 import os
 import re
 
+from sklearn.exceptions import NotFittedError
 from xgboost import XGBClassifier
 from xgboost.core import XGBoostError
 
@@ -10,6 +11,8 @@ from winning_horse_models import FlattenMixin
 
 
 class XGBoostWinningModel(FlattenMixin, AbstractWinningModel):
+    _NotFittedModelError = NotFittedError
+
     def _create_n_horses_model(self, n_horses: int):
         return XGBClassifier()
 
@@ -29,7 +32,7 @@ class XGBoostWinningModel(FlattenMixin, AbstractWinningModel):
                 print(f"Could not save model for {n_horse} horses: {e}")
 
     @classmethod
-    def load_model(cls, trainable: bool) -> "XGBoostWinningModel":
+    def load_model(cls) -> "XGBoostWinningModel":
         model = XGBoostWinningModel()
         assert cls.__name__ in os.listdir(SAVED_MODELS_DIR)
         for filename in os.listdir(os.path.join(SAVED_MODELS_DIR, cls.__name__)):

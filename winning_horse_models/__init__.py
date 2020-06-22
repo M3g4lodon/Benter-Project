@@ -2,17 +2,22 @@ import os
 import re
 from abc import ABCMeta
 from abc import abstractmethod
+from typing import Optional
 
 import joblib
 import numpy as np
 
 from constants import SAVED_MODELS_DIR
 
-# TODO add lgbm, MLP,
+# TODO add MLP
 
 
 class AbstractWinningModel(metaclass=ABCMeta):
+
+    _NotFittedModelError: Optional[Exception] = None
+
     def __init__(self):
+        assert self._NotFittedModelError is not None
         self.n_horses_models = {}
 
     def get_n_horses_model(self, n_horses: int):
@@ -46,7 +51,7 @@ class SequentialMixin:
         model = self.get_n_horses_model(n_horses=x.shape[1])
         try:
             return model.predict(x=x)
-        except Exception:  # pylint: disable=broad-except
+        except _NotFittedModelError:
             raise ModelNotCreatedOnceError
 
 
@@ -59,7 +64,7 @@ class FlattenMixin:
                     a=x, newshape=(x.shape[0], x.shape[1] * x.shape[2]), order="F"
                 )
             )
-        except Exception:  # pylint: disable=broad-except
+        except _NotFittedModelError:
             raise ModelNotCreatedOnceError
 
 

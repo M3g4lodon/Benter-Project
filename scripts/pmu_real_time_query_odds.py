@@ -1,22 +1,17 @@
 import datetime as dt
 import os
 import time
-
 import pytz
 import requests
 from cachetools import func
-
 import utils
 from constants import PMU_DATA_DIR
 from utils.pmu_api_data import get_pmu_api_url
 from utils.scrape import create_day_folder
 from utils.scrape import execute_get_query
-
 TIMEZONE = "Europe/Paris"
 # TODO scrape pronostics in real time (only available for few weeks)
 # TODO Handle ConnectionError error
-
-
 def execute_queries(seconds_before: int, race_times: dict) -> int:
     query_count = 0
     prefix = f"{seconds_before}s_before"
@@ -36,17 +31,12 @@ def execute_queries(seconds_before: int, race_times: dict) -> int:
                 utils.dump_json(data=execute_get_query(url=url), filename=filename)
                 query_count += 1
     return query_count
-
-
 @func.ttl_cache(maxsize=10, ttl=60 * 10)
 def query_program(date: dt.date) -> dict:
     return execute_get_query(url=get_pmu_api_url(url_name="PROGRAMME", date=date))
-
-
 def update():
     tz = pytz.timezone(TIMEZONE)
     dt_now = tz.localize(dt.datetime.now())
-
     race_times = {}
     for date in [
         dt.date.today(),
@@ -54,11 +44,9 @@ def update():
         dt.date.today() - dt.timedelta(days=1),
     ]:
         programme = query_program(date=date)
-
         if "programme" not in programme:
             print(f"\rNo program (yet?) for date {date.isoformat()}", end="")
             continue
-
         create_day_folder(date=date, source="PMU")
         for reunion in programme["programme"]["reunions"]:
             for course in reunion["courses"]:
@@ -72,12 +60,19 @@ def update():
                     )
                     - dt_now
                 )
-
     coming_races = {
         (date, r_i, c_i): time_to_race
         for (date, r_i, c_i), time_to_race in race_times.items()
         if time_to_race.total_seconds() > 0
     }
+    if not coming_races:
+        print(
+            f"\r[{dt.datetime.now().isoformat()}] Can not find next race "
+            ", waiting 1 min...",
+            end="",
+        )
+        time.sleep(60)
+        return 0
     time_to_next_race = min(coming_races.values())
     if time_to_next_race.total_seconds() > 60 * 10:
         print(
@@ -86,24 +81,17 @@ def update():
             end="",
         )
         time.sleep(60)
-
+        return 0
     query_count = 0
     # 5s
     query_count += execute_queries(seconds_before=5, race_times=coming_races)
-
     # 30s
     query_count += execute_queries(seconds_before=30, race_times=coming_races)
-
     # 1min
     query_count += execute_queries(seconds_before=60, race_times=coming_races)
-
     return query_count
-
-
 def run():
-
     print("Query Odds before races from pmu.fr/turf")
-
     query_count = 0
     retry_count = 0
     while True:
@@ -132,7 +120,5 @@ def run():
             f"{query_count} queries in total",
             end="",
         )
-
-
 if __name__ == "__main__":
     run()

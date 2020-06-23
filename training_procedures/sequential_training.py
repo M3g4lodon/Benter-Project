@@ -2,8 +2,8 @@ from typing import Tuple
 
 import numpy as np
 
+import winning_validation.errors
 from utils import import_data
-from utils import winning_validation
 from winning_horse_models import AbstractWinningModel
 
 
@@ -129,7 +129,7 @@ def train_on_all_races(
     Train on several epochs on all races, in the order of happening"""
     assert n_epochs
 
-    training_history = {"epochs": {}}
+    training_history: dict = {"epochs": {}}
 
     for epoch in range(n_epochs):
         training_history["epochs"][epoch] = {"history": []}
@@ -148,11 +148,11 @@ def train_on_all_races(
 
         training_history["epochs"][epoch][
             "val_performance"
-        ] = winning_validation.compute_validation_error(
+        ] = winning_validation.errors.compute_validation_error(
             source=source,
             k=1,
             winning_model=winning_model,
-            validation_method=winning_validation.exact_top_k,
+            validation_method=winning_validation.errors.exact_top_k,
         )
 
     return winning_model, training_history

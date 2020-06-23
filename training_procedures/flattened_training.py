@@ -74,26 +74,33 @@ def train_per_n_horses_races(
         model = model.fit(X=x, y=y)
 
         if verbose:
-
-            loss_per_horse = (
-                metrics.log_loss(
-                    y_true=_one_hot_encode(y, n_horses=n_horses),
-                    y_pred=model.predict_proba(x),
+            y_pred = model.predict_proba(x)
+            y_true = _one_hot_encode(y, n_horses=n_horses)
+            if np.any(np.isnan(y_pred)):
+                print(
+                    f"Model predict proba with NA values on "
+                    f"{np.any(np.isnan(y_pred), axis=1).sum()} races"
                 )
-                / n_horses
-            )
+                y_true = y_true[np.all(~np.isnan(y_pred), axis=1)]
+                y_pred = y_pred[np.all(~np.isnan(y_pred), axis=1)]
+            loss_per_horse = metrics.log_loss(y_true=y_true, y_pred=y_pred) / n_horses
             accuracy = metrics.accuracy_score(y_true=y, y_pred=model.predict(x))
             if x_val.shape[0] < MIN_N_EXAMPLES:
                 val_loss_per_horse = np.nan
                 val_accuracy = np.nan
 
             else:
-                val_loss_per_horse = (
-                    metrics.log_loss(
-                        y_true=_one_hot_encode(y_val, n_horses=n_horses),
-                        y_pred=model.predict_proba(x_val),
+                y_pred = model.predict_proba(x_val)
+                y_true = _one_hot_encode(y_val, n_horses=n_horses)
+                if np.any(np.isnan(y_pred)):
+                    print(
+                        f"Model predict proba with NA values on "
+                        f"{np.any(np.isnan(y_pred), axis=1).sum()} validation races"
                     )
-                    / n_horses
+                    y_true = y_true[np.all(~np.isnan(y_pred), axis=1)]
+                    y_pred = y_pred[np.all(~np.isnan(y_pred), axis=1)]
+                val_loss_per_horse = (
+                    metrics.log_loss(y_true=y_true, y_pred=y_pred) / n_horses
                 )
                 val_accuracy = metrics.accuracy_score(
                     y_true=y_val, y_pred=model.predict(x_val)

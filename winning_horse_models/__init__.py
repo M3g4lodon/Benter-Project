@@ -51,7 +51,7 @@ class SequentialMixin:
         model = self.get_n_horses_model(n_horses=x.shape[1])
         try:
             return model.predict(x=x)
-        except _NotFittedModelError:
+        except self._NotFittedModelError:
             raise ModelNotCreatedOnceError
 
 
@@ -64,7 +64,7 @@ class FlattenMixin:
                     a=x, newshape=(x.shape[0], x.shape[1] * x.shape[2]), order="F"
                 )
             )
-        except _NotFittedModelError:
+        except self._NotFittedModelError:
             raise ModelNotCreatedOnceError
 
 

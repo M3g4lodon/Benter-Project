@@ -7,6 +7,7 @@ from constants import PMU_MINIMUM_BET_SIZE
 from utils import expected_return
 from utils import import_data
 from winning_horse_models import AbstractWinningModel
+from winning_horse_models import ModelNotCreatedOnceError
 from winning_horse_models.baselines import RandomModel
 
 
@@ -74,8 +75,14 @@ def compute_return_against_odds(
         previous_stakes = np.stack(
             arrays=[race_df["totalEnjeu"].values for race_df in race_dfs], axis=0
         )
+        try:
+            model_prediction = winning_model.predict(x=x_race)
+        except ModelNotCreatedOnceError:
+            res["n_horses_return_against_odds"][n_horses] = {
+                "message": f"Model was not created for {n_horses}"
+            }
+            continue
 
-        model_prediction = winning_model.predict(x=x_race)
         random_prediction = RandomModel().predict(x=x_race)
         race_ps_notna_index = np.logical_not(np.isnan(previous_stakes)).all(axis=1)
         rectified_pari_mutual_probas = get_rectified_pari_mutual_probabilities(
@@ -152,12 +159,12 @@ def compute_overall_average(
 
     predicted_returns = []
     random_returns = []
-    for n_horses, validation in return_against_odds[
-        "n_horses_return_against_odds"
-    ].items():
-        if "predicted_return_against_odds" in validation:
-            predicted_returns.append(validation["predicted_return_against_odds"])
-            random_returns.append(validation["random_predicted_return_against_odds"])
+    for return_againsts in return_against_odds["n_horses_return_against_odds"].values():
+        if "predicted_return_against_odds" in return_againsts:
+            predicted_returns.append(return_againsts["predicted_return_against_odds"])
+            random_returns.append(
+                return_againsts["random_predicted_return_against_odds"]
+            )
     if not predicted_returns:
         return None, None, None, None
     predicted_returns = np.concatenate(predicted_returns)

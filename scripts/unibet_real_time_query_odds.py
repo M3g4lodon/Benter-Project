@@ -12,7 +12,7 @@ from utils.scrape import create_day_folder
 from utils.scrape import execute_get_query
 
 TIMEZONE = "Europe/Paris"
-# TODO if not next races
+
 
 def execute_queries(seconds_before: int, race_times: dict) -> int:
     query_count = 0
@@ -84,13 +84,16 @@ def update():
         return 0
 
     time_to_next_race = min(coming_races.values())
-    if time_to_next_race.total_seconds() > 60 * 10:
+    if time_to_next_race.total_seconds() > 90:
+        time_to_wait = min(
+            time_to_next_race - dt.timedelta(seconds=70), dt.timedelta(minutes=10)
+        )
         print(
-            f"\r[{dt.datetime.now().isoformat()}] Next race in "
-            f"{time_to_next_race}, waiting 1 min...",
+            f"\r[{dt.datetime.now().isoformat()}] Next race in {time_to_next_race}, "
+            f"waiting {time_to_wait} min...",
             end="",
         )
-        time.sleep(60)
+        time.sleep(time_to_wait.total_seconds())
         return 0
 
     query_count = 0

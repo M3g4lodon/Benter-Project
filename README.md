@@ -14,7 +14,12 @@ Inspired by this Bloomberg [article](https://www.bloomberg.com/news/features/201
 | ------------------| :--------------------:|--------------:|
 |Scraped Website    |PMU Unibet(stopped)    |               |
 |Betting type       |Simple_gagnant         | Simple_place  |
-|Training           | train on n_horses     | train on all races, permutations on races|
+|Training           | train on n_horses,permutation, subraces| train on all races, gridsearch, feature selection|
 |Winning Horse Model|logistic regression SGD, baselines, skleanrn,|sequential MLP, MLP, transformer, dimension reduction technique|
 |Wagering strategy  |Kelly,Most Expected return, baselines, factories| |
 |Real time betting  |Real time suggestion   |Real time betting directly on PMU |
+
+
+---
+Appendix
+Count python file lines: `git ls-files | grep ".\.py" | xargs wc -l`

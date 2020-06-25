@@ -1,20 +1,31 @@
 import os
 import re
 
-from sklearn.exceptions import NotFittedError
+import numpy as np
 from xgboost import XGBClassifier
 from xgboost.core import XGBoostError
 
 from constants import SAVED_MODELS_DIR
 from winning_horse_models import AbstractWinningModel
-from winning_horse_models import FlattenMixin
+from winning_horse_models import ModelNotCreatedOnceError
 
 
-class XGBoostWinningModel(FlattenMixin, AbstractWinningModel):
-    _NotFittedModelError = NotFittedError
+class XGBoostWinningModel(AbstractWinningModel):
+    _NotFittedModelError = XGBoostError
 
     def _create_n_horses_model(self, n_horses: int):
         return XGBClassifier()
+
+    def predict(self, x: np.array):
+        model = self.get_n_horses_model(n_horses=x.shape[1])
+        try:
+            return model.predict_proba(
+                data=np.reshape(
+                    a=x, newshape=(x.shape[0], x.shape[1] * x.shape[2]), order="F"
+                )
+            )
+        except self._NotFittedModelError:
+            raise ModelNotCreatedOnceError
 
     def save_model(self) -> None:
         if self.__class__.__name__ not in os.listdir(SAVED_MODELS_DIR):

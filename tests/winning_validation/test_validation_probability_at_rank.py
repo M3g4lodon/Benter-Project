@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from winning_validation.probability_at_rank import compute_rank_proba
+from winning_validation.r_squared import compute_rank_proba
 
 
 @pytest.mark.parametrize(

@@ -131,13 +131,13 @@ def extract_x_y(  # pylint:disable=too-many-branches
 
     else:
         if y_format == "first_position":
-            y_race = (race_df.horse_place == 1).values
+            y_race = (race_df["horse_place"] == 1).values
             if y_race.sum() == 0:
                 return None, None
             assert y_race.sum() > 0
             y_race = y_race / y_race.sum()  # Beware that ExAequo is possible
         elif y_format == "rank":
-            y_race = race_df.horse_place.values
+            y_race = race_df["horse_place"].values
             y_race[np.isnan(y_race)] = y_race.shape[0]
         else:  # y_format == 'index_first' # test if this format is needed
             # TODO take into account exaequo

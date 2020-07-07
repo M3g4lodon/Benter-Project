@@ -2,6 +2,7 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.exceptions import NotFittedError
+from sklearn.linear_model import LogisticRegression
 from sklearn.linear_model import SGDClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
@@ -63,3 +64,10 @@ class LDAModel(_SklearnMixin, FlattenMixin, JoblibPicklerMixin, AbstractWinningM
 class SGDModel(_SklearnMixin, FlattenMixin, JoblibPicklerMixin, AbstractWinningModel):
     def _create_n_horses_model(self, n_horses: int):
         return SGDClassifier(loss="log")
+
+
+class LogisticRegressionModel(
+    _SklearnMixin, FlattenMixin, JoblibPicklerMixin, AbstractWinningModel
+):
+    def _create_n_horses_model(self, n_horses: int):
+        return LogisticRegression()

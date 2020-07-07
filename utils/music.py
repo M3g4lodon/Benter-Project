@@ -40,15 +40,15 @@ from collections import namedtuple
 import numpy as np
 import pandas as pd
 
-ParsedMusic = namedtuple("ParsedMusic", ["win_rate", "mean_place"])
+ParsedMusic = namedtuple("ParsedMusic", ["win_rate", "mean_place", "n_races_in_music"])
 
 
 def parse_music(music: str, verbose=False) -> ParsedMusic:
     if pd.isna(music):
-        return ParsedMusic(win_rate=None, mean_place=None)
+        return ParsedMusic(win_rate=None, mean_place=None, n_races_in_music=None)
 
     if music == "()":
-        return ParsedMusic(win_rate=None, mean_place=None)
+        return ParsedMusic(win_rate=None, mean_place=None, n_races_in_music=None)
 
     events = []
 
@@ -70,20 +70,16 @@ def parse_music(music: str, verbose=False) -> ParsedMusic:
     if verbose:
         print(f"Found events: {events}")
 
+    if not events:
+        return ParsedMusic(win_rate=np.nan, mean_place=np.nan, n_races_in_music=0)
+
     win_rate = float(np.mean([position == "1" for position, _ in events]))
     mean_place = float(
         np.mean(
             [int(position) for position, _ in events if re.match(r"\d{1,2}", position)]
         )
     )
-    return ParsedMusic(win_rate=win_rate, mean_place=mean_place)
-
-
-if __name__ == "__main__":
-    assert parse_music("0p 3p Ap") == ParsedMusic(0.0, 1.5)
-    assert parse_music("0p3pAp") == ParsedMusic(0.0, 1.5)
-
-    assert parse_music("1p 3p 1a 0t") == ParsedMusic(0.5, 1.25)
-
-    assert np.isnan(parse_music(" (inédit) ")[0])
-    assert np.isnan(parse_music(" (inédit) ")[1])
+    n_races_in_music = len(events)
+    return ParsedMusic(
+        win_rate=win_rate, mean_place=mean_place, n_races_in_music=n_races_in_music
+    )

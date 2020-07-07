@@ -59,14 +59,38 @@ in participants
 """
 import functools
 
+import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
 from utils.music import parse_music
 
 
+def is_complete_past_races(rh_serie: pd.Series, horse_history: pd.DataFrame) -> bool:
+    if rh_serie.indicateurInedit:
+        return True
+
+    previous_horse_races = horse_history[
+        horse_history["race_datetime"] < rh_serie.race_datetime
+    ]
+    if not (
+        previous_horse_races["n_run_races"] == np.arange(len(previous_horse_races))
+    ).all():
+        return False
+
+    n_past_races = len(previous_horse_races.index)
+    n_run_races = max(
+        parse_music(rh_serie.musique).n_races_in_music or 0, rh_serie.n_run_races
+    )
+
+    return n_run_races == n_past_races
+
+
 def get_race_horse_features(
-    rh_serie: pd.Series, jockey_history: pd.DataFrame, trainer_history: pd.DataFrame
+    rh_serie: pd.Series,
+    horse_history: pd.DataFrame,
+    jockey_history: pd.DataFrame,
+    trainer_history: pd.DataFrame,
 ):
     parsed_music = parse_music(music=rh_serie.musique)
 
@@ -98,12 +122,22 @@ def get_race_horse_features(
         "jockey_mean_place": jockey_mean_place,
         "trainer_win_rate": trainer_win_rate,
         "trainer_mean_place": trainer_mean_place,
+        "complete_past_races": is_complete_past_races(
+            rh_serie=rh_serie, horse_history=horse_history
+        ),
     }
 
 
 def append_features(
     race_horse_df: pd.DataFrame, historical_race_horse_df: pd.DataFrame
 ) -> pd.DataFrame:
+    @functools.lru_cache(maxsize=None)
+    def get_horse_history(horse_id: int) -> pd.DataFrame:
+        return race_horse_df[
+            (race_horse_df["horse_id"] == horse_id)
+            & (race_horse_df["statut"] == "PARTANT")
+        ][["race_datetime", "n_run_races"]].dropna(axis=0)
+
     @functools.lru_cache(maxsize=None)
     def get_jockey_history(jockey_name: str) -> pd.DataFrame:
         return historical_race_horse_df[
@@ -127,6 +161,7 @@ def append_features(
     ):
         features_dict = get_race_horse_features(
             rh_serie=rh_serie,
+            horse_history=get_horse_history(horse_id=rh_serie.horse_id),
             jockey_history=get_jockey_history(jockey_name=rh_serie.jockey_name),
             trainer_history=get_trainer_history(trainer_name=rh_serie.trainer_name),
         )

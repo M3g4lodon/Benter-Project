@@ -59,9 +59,8 @@ def train_on_each_horse_with_epochs(
                 if verbose:
                     print(f"\nNo val data for {n_horses}")
 
-            model = winning_model.get_n_horses_model(n_horses=n_horses)
             if x.size == 0:
-                val_loss = model.evaluate(x=x_val, y=y_val)
+                val_loss = winning_model.evaluate(x=x_val, y=y_val)
                 val_loss_per_horse = val_loss / n_horses
                 message = (
                     f"Evaluation only for {n_horses} horses: loss per horse None, "
@@ -80,9 +79,9 @@ def train_on_each_horse_with_epochs(
                 continue
 
             if x_val.size == 0:
-                history = model.fit(x=x, y=y, verbose=int(verbose))
+                history = winning_model.fit(x=x, y=y, verbose=int(verbose))
             else:
-                history = model.fit(
+                history = winning_model.fit(
                     x=x, y=y, validation_data=(x_val, y_val), verbose=int(verbose)
                 )
             loss_per_horse = history.history["loss"][0] / n_horses

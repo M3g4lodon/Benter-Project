@@ -1,18 +1,23 @@
 import os
 import re
-from abc import ABCMeta
+from abc import ABC
 from abc import abstractmethod
+from typing import List
 from typing import Optional
 
 import joblib
 import numpy as np
 
 from constants import SAVED_MODELS_DIR
+from constants import SOURCE_PMU
+from utils import preprocess
+
+N_FEATURES = preprocess.get_n_preprocessed_feature_columns(source=SOURCE_PMU)
 
 # TODO add MLP
 
 
-class AbstractWinningModel(metaclass=ABCMeta):
+class AbstractWinningModel(ABC):
 
     _NotFittedModelError: Optional[Exception] = None
 
@@ -47,25 +52,62 @@ class AbstractWinningModel(metaclass=ABCMeta):
 
 
 class SequentialMixin:
-    def predict(self, x: np.array):
+    def __init__(self, selected_features: Optional[List[int]] = None):
+        assert self._NotFittedModelError is not None
+        self.n_horses_models = {}
+        if selected_features is not None:
+            assert len(selected_features) <= N_FEATURES
+            assert all(0 <= index < N_FEATURES for index in selected_features)
+        self.n_features = (
+            N_FEATURES if selected_features is None else len(selected_features)
+        )
+        self.selected_features = selected_features
+
+    def predict(self, x: np.array, **kwargs):
         model = self.get_n_horses_model(n_horses=x.shape[1])
         try:
-            return model.predict(x=x)
+            if self.selected_features is not None:
+                return model.predict(x=x[:, :, self.selected_features], **kwargs)
+            return model.predict(x=x, **kwargs)
+        except self._NotFittedModelError:
+            raise ModelNotCreatedOnceError
+
+    def fit(self, x: np.array, y: np.array, **kwargs):
+        model = self.get_n_horses_model(n_horses=x.shape[1])
+        if self.selected_features is None:
+            return model.fit(x=x, y=y, **kwargs)
+
+        if "validation_data" in kwargs:
+            x_val, y_val = kwargs["validation_data"]
+            x_val = x_val[:, :, self.selected_features]
+            kwargs["validation_data"] = (x_val, y_val)
+        return model.fit(x=x[:, :, self.selected_features], y=y, **kwargs)
+
+    def evaluate(self, x: np.array, y: np.array, **kwargs):
+        model = self.get_n_horses_model(n_horses=x.shape[1])
+        try:
+            if self.selected_features is not None:
+                return model.evaluate(x=x[:, :, self.selected_features], y=y, **kwargs)
+            return model.evaluate(x=x, y=y, **kwargs)
+
         except self._NotFittedModelError:
             raise ModelNotCreatedOnceError
 
 
 class FlattenMixin:
-    def predict(self, x: np.array):
+    def predict(self, x: np.array, **kwargs):
         model = self.get_n_horses_model(n_horses=x.shape[1])
         try:
             return model.predict_proba(
                 X=np.reshape(
                     a=x, newshape=(x.shape[0], x.shape[1] * x.shape[2]), order="F"
-                )
+                ),
+                **kwargs,
             )
         except self._NotFittedModelError:
             raise ModelNotCreatedOnceError
+
+    # TODO extend to other sklearn api methods, with feature selection
 
 
 class JoblibPicklerMixin:

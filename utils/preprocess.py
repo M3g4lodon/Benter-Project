@@ -1,9 +1,13 @@
+import math
+from typing import List
 from typing import Tuple
 
+import numpy as np
 import pandas as pd
 from joblib import Memory
 
 from constants import CACHE_DIR
+from utils import import_data
 from utils.import_data import get_splitted_featured_data
 
 memory = Memory(location=CACHE_DIR, verbose=0)
@@ -60,10 +64,6 @@ NUMERICAL_FEATURES = [
     "handicap_distance",
     "handicap_weight",
     "duration_since_last_race",
-    "course_prize_pool",
-    "course_winner_prize",
-    "horse_current_year_prize",
-    "horse_career_prize",
     "handicap_value",
     "placeCorde",
     "horse_age",
@@ -78,6 +78,13 @@ NUMERICAL_FEATURES = [
     "trainer_mean_place",
 ]
 
+LOG_NUMERICAL_FEATURES = [
+    "course_prize_pool",
+    "course_winner_prize",
+    "horse_current_year_prize",
+    "horse_career_prize",
+]
+
 
 @memory.cache
 def load_preprocess(source: str) -> Tuple[dict, dict]:
@@ -88,13 +95,25 @@ def load_preprocess(source: str) -> Tuple[dict, dict]:
             "mean": train_race_horse_df[numerical_feature].mean(),
             "std": train_race_horse_df[numerical_feature].std(),
         }
-
+    for numerical_feature in LOG_NUMERICAL_FEATURES:
+        standard_scaler_parameters[f"log_{numerical_feature}"] = {
+            "mean": np.log(1 + train_race_horse_df[numerical_feature]).mean(),
+            "std": np.log(1 + train_race_horse_df[numerical_feature]).std(),
+        }
     ohe_features_values = {
         ohe_feature: set(train_race_horse_df[ohe_feature].unique())
         for ohe_feature in TO_ONE_HOT_ENCODE_COLUMNS
     }
 
     return standard_scaler_parameters, ohe_features_values
+
+
+@memory.cache
+def get_preprocessed_columns(source: str) -> List[str]:
+    race_horse_df = import_data.load_featured_data(source=source)
+    return list(
+        preprocess(race_horse_df=race_horse_df.iloc[:1, :], source="PMU").keys()
+    )
 
 
 @memory.cache
@@ -107,6 +126,8 @@ def get_n_preprocessed_feature_columns(source: str) -> int:
         - len(TO_ONE_HOT_ENCODE_COLUMNS)
     )
     res = res + 2 - 1  # Unshod
+
+    assert res == len(get_preprocessed_columns(source=source))
     return res
 
 
@@ -124,8 +145,19 @@ def preprocess(race_horse_df: pd.DataFrame, source: str) -> pd.DataFrame:
         ) / standard_scaler_parameters[numerical_feature]["std"]
         features_df[numerical_feature].fillna(0, inplace=True)
 
+    for numerical_feature in LOG_NUMERICAL_FEATURES:
+        features_df[numerical_feature] = (
+            np.log(1 + features_df[numerical_feature])
+            - standard_scaler_parameters[f"log_{numerical_feature}"]["mean"]
+        ) / standard_scaler_parameters[f"log_{numerical_feature}"]["std"]
+        features_df[numerical_feature].fillna(0, inplace=True)
+
     for ohe_feature in TO_ONE_HOT_ENCODE_COLUMNS:
         for value in ohe_features_values[ohe_feature]:
+            if isinstance(value, float) and math.isnan(value):
+                features_df[f"{ohe_feature}_{value}"] = features_df[ohe_feature].isna()
+                continue
+
             features_df[f"{ohe_feature}_{value}"] = features_df[ohe_feature] == value
 
         features_df.drop([ohe_feature], inplace=True, axis=1)

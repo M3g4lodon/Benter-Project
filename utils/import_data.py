@@ -139,7 +139,7 @@ def extract_x_y(  # pylint:disable=too-many-branches
         elif y_format == "rank":
             y_race = race_df["horse_place"].values
             y_race[np.isnan(y_race)] = y_race.shape[0]
-        else:  # y_format == 'index_first' # test if this format is needed
+        else:  # y_format == 'index_first'
             # TODO take into account exaequo
             # in case of exAequo, only the first horse in index is returned as first
             candidates = (race_df.horse_place == 1).values

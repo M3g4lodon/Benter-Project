@@ -92,6 +92,7 @@ def compute_log_likelihood(intercept_weights):
     assert len(weights) == N_FEATURES
     min_horse, max_horse = import_data.get_min_max_horse(source=SOURCE_PMU)
 
+    # TODO np.vectorize this function
     def _compute_n_horses_log_likelihood(n_horses):
         x, y, _ = import_data.get_races_per_horse_number(
             source=SOURCE_PMU,

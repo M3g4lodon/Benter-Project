@@ -2,6 +2,8 @@ import datetime as dt
 import functools
 import os
 from itertools import combinations
+from typing import Callable
+from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Tuple
@@ -153,17 +155,16 @@ def extract_x_y(  # pylint:disable=too-many-branches
 
 
 @memory.cache
-def get_races_per_horse_number(
+def _get_races_per_horse_number(
     source: str,
     n_horses: int,
     on_split: str,
-    x_format: str,
     y_format: str,
     remove_nan_odds: bool = False,
 ) -> Tuple[np.array, np.array, List[pd.DataFrame]]:
     """For the given source, the given split, the given number of horses per races,
     the given y_format,
-    returns numpy arrays of features, y, and odds"""
+    returns numpy arrays of features, y, and race_dfs (is cached)"""
 
     rh_df = get_split_date(source=source, on_split=on_split)
 
@@ -176,7 +177,10 @@ def get_races_per_horse_number(
         assert len(race_df) == n_horses
 
         x_race, y_race = extract_x_y(
-            race_df=race_df, x_format=x_format, y_format=y_format, source=source
+            race_df=race_df,
+            x_format="sequential_per_horse",
+            y_format=y_format,
+            source=source,
         )
         if any([x_race is None, y_race is None]):
             continue
@@ -193,6 +197,43 @@ def get_races_per_horse_number(
         np.asarray(y).astype(np.float32),
         race_dfs,
     )
+
+
+def get_races_per_horse_number(
+    source: str,
+    n_horses: int,
+    on_split: str,
+    x_format: str,
+    y_format: str,
+    remove_nan_odds: bool = False,
+    extra_features_func: Optional[Callable[[pd.DataFrame], pd.DataFrame]] = None,
+) -> Tuple[np.array, np.array, List[pd.DataFrame]]:
+    """For the given source, the given split, the given number of horses per races,
+    the given y_format,
+    returns numpy arrays of features, y, and race_dfs
+
+    We expect `extra_features_func` to return a DataFrame in the same format as race_df
+    (column names are extra feature name, with the length of n_horses)"""
+
+    assert x_format in {"sequential_per_horse", "flattened"}
+
+    x, y, race_dfs = _get_races_per_horse_number(
+        source=source,
+        n_horses=n_horses,
+        on_split=on_split,
+        y_format=y_format,
+        remove_nan_odds=remove_nan_odds,
+    )
+    if x_format == "flattened":
+        x = np.reshape(a=x, newshape=(x.shape[0], x.shape[1] * x.shape[2]), order="F")
+
+    if extra_features_func is not None and x.size != 0:
+        extra_features = np.stack(
+            [extra_features_func(race_df).values for race_df in race_dfs]
+        )
+        extra_features = np.asarray(extra_features).astype(np.float32)
+        x = np.append(x, extra_features, axis=2)
+    return x, y, race_dfs
 
 
 @memory.cache

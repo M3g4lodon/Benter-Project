@@ -1,6 +1,9 @@
+from typing import Callable
+from typing import Optional
 from typing import Tuple
 
 import numpy as np
+import pandas as pd
 
 import winning_validation.errors
 from utils import import_data
@@ -12,6 +15,7 @@ def train_on_each_horse_with_epochs(
     source: str,
     winning_model: AbstractWinningModel,
     n_epochs: int,
+    extra_features_func: Optional[Callable[[pd.DataFrame], pd.DataFrame]] = None,
     verbose: bool = False,
 ) -> Tuple[AbstractWinningModel, dict]:
     """Train deep learning (tf.keras like) model of each n_horses on n_epochs.
@@ -35,6 +39,7 @@ def train_on_each_horse_with_epochs(
                 on_split="train",
                 x_format="sequential_per_horse",
                 y_format="first_position",
+                extra_features_func=extra_features_func,
             )
             x_val, y_val, _ = import_data.get_races_per_horse_number(
                 source=source,
@@ -42,6 +47,7 @@ def train_on_each_horse_with_epochs(
                 on_split="val",
                 x_format="sequential_per_horse",
                 y_format="first_position",
+                extra_features_func=extra_features_func,
             )
             if epoch == 0:
                 training_history["n_horses"][n_horses] = {

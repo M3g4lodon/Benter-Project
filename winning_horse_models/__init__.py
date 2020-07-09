@@ -38,7 +38,11 @@ class AbstractWinningModel(ABC):
         pass
 
     @abstractmethod
-    def predict(self, x: np.array):
+    def fit(self, x: np.array, y: np.array, **kwargs):
+        """A common method to fit the model on given races (with n_horses)"""
+
+    @abstractmethod
+    def predict(self, x: np.array, **kwargs):
         """A common method to predict probabilities on given races (with n_horses)"""
 
     @abstractmethod
@@ -95,6 +99,7 @@ class SequentialMixin:
 
 
 class FlattenMixin:
+    # TODO add flatten x for fit
     def predict(self, x: np.array, **kwargs):
         model = self.get_n_horses_model(n_horses=x.shape[1])
         try:

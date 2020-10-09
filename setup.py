@@ -29,6 +29,8 @@ setuptools.setup(
         "jupyterlab",
         "seaborn",
         "tabulate",
+        "tpot",
+        "hyperopt",
     ],
     extras_require={"test": ["pytest"]},
     project_urls={"Source": "https://github.com/M3g4lodon/Benter-Project"},

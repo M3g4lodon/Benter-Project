@@ -10,6 +10,7 @@ attrs==19.3.0             # via jsonschema
 backcall==0.2.0           # via ipython
 bleach==3.1.5             # via nbconvert
 cachetools==4.1.0         # via google-auth
+catboost==0.24.2          # via benter-project (setup.py)
 certifi==2020.4.5.2       # via requests
 chardet==3.0.4            # via requests
 cloudpickle==1.6.0        # via hyperopt
@@ -23,6 +24,7 @@ gast==0.2.2               # via tensorflow
 google-auth==1.17.0       # via google-auth-oauthlib, tensorboard
 google-auth-oauthlib==0.4.1  # via tensorboard
 google-pasta==0.2.0       # via tensorflow
+graphviz==0.14.2          # via catboost
 grpcio==1.29.0            # via tensorboard, tensorflow
 h5py==2.10.0              # via keras-applications
 hyperopt==0.2.5           # via benter-project (setup.py)
@@ -46,22 +48,22 @@ kiwisolver==1.2.0         # via matplotlib
 lightgbm==2.3.1           # via benter-project (setup.py)
 markdown==3.2.2           # via tensorboard
 markupsafe==1.1.1         # via jinja2
-matplotlib==3.2.1         # via benter-project (setup.py), seaborn
+matplotlib==3.2.1         # via benter-project (setup.py), catboost, seaborn
 mistune==0.8.3            # via nbconvert
 nbconvert==5.6.1          # via notebook
 nbformat==4.4.0           # via nbconvert, notebook
 networkx==2.5             # via hyperopt
 notebook==6.0.3           # via jupyterlab, jupyterlab-server
-numpy==1.18.5             # via benter-project (setup.py), deap, h5py, hyperopt, keras-applications, keras-preprocessing, lightgbm, matplotlib, opt-einsum, pandas, scikit-learn, scipy, seaborn, tensorboard, tensorflow, tpot, xgboost
+numpy==1.18.5             # via benter-project (setup.py), catboost, deap, h5py, hyperopt, keras-applications, keras-preprocessing, lightgbm, matplotlib, opt-einsum, pandas, scikit-learn, scipy, seaborn, tensorboard, tensorflow, tpot, xgboost
 oauthlib==3.1.0           # via requests-oauthlib
 opt-einsum==3.2.0         # via tensorflow
 packaging==20.4           # via bleach
-pandas==1.0.4             # via benter-project (setup.py), seaborn, tpot
+pandas==1.0.4             # via benter-project (setup.py), catboost, seaborn, tpot
 pandocfilters==1.4.2      # via nbconvert
 parso==0.1.1              # via jedi
 pexpect==4.8.0            # via ipython
 pickleshare==0.7.5        # via ipython
-plotly==4.8.1             # via benter-project (setup.py)
+plotly==4.8.1             # via benter-project (setup.py), catboost
 prometheus-client==0.8.0  # via notebook
 prompt-toolkit==3.0.5     # via ipython
 protobuf==3.12.2          # via tensorboard, tensorflow
@@ -79,10 +81,10 @@ requests-oauthlib==1.3.0  # via google-auth-oauthlib
 retrying==1.3.3           # via plotly
 rsa==4.1                  # via google-auth
 scikit-learn==0.23.1      # via benter-project (setup.py), lightgbm, tpot
-scipy==1.4.1              # via hyperopt, lightgbm, scikit-learn, seaborn, tensorflow, tpot, xgboost
+scipy==1.4.1              # via catboost, hyperopt, lightgbm, scikit-learn, seaborn, tensorflow, tpot, xgboost
 seaborn==0.10.1           # via benter-project (setup.py)
 send2trash==1.5.0         # via notebook
-six==1.15.0               # via absl-py, bleach, cycler, google-auth, google-pasta, grpcio, h5py, hyperopt, jsonschema, keras-preprocessing, packaging, plotly, protobuf, pyrsistent, python-dateutil, retrying, tensorboard, tensorflow, traitlets
+six==1.15.0               # via absl-py, bleach, catboost, cycler, google-auth, google-pasta, grpcio, h5py, hyperopt, jsonschema, keras-preprocessing, packaging, plotly, protobuf, pyrsistent, python-dateutil, retrying, tensorboard, tensorflow, traitlets
 stopit==1.1.2             # via tpot
 tabulate==0.8.7           # via benter-project (setup.py)
 tensorboard==2.1.1        # via tensorflow

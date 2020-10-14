@@ -32,6 +32,7 @@ setuptools.setup(
         "tpot",
         "hyperopt",
         "catboost",
+        "featuretools",
     ],
     extras_require={"test": ["pytest"]},
     project_urls={"Source": "https://github.com/M3g4lodon/Benter-Project"},

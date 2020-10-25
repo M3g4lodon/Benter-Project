@@ -59,14 +59,12 @@ def load_queried_data() -> pd.DataFrame:
                     "ARRIVEE_DEFINITIVE_COMPLETE",
                     "COURSE_ARRETEE",
                 ], course["statut"]
-                r_i = course["numReunion"]
-                c_i = course["numOrdre"]
 
                 race_horses_records = get_race_horses_records(
                     programme=programme_json,
                     date=date,
-                    r_i=r_i,
-                    c_i=c_i,
+                    r_i=course["numReunion"],
+                    c_i=course["numOrdre"],
                     should_be_on_disk=True,
                 )
                 if race_horses_records is None:

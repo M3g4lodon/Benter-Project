@@ -441,39 +441,24 @@ def get_race_horses_records(
         race_horse["course_discipline"] = course["discipline"]
         race_horse["course_specialite"] = course["specialite"]
         race_horse["course_condition_sexe"] = course["conditionSexe"]
-        race_horse["course_condition_age"] = (
-            None if "conditionAge" not in course else course["conditionAge"]
-        )
-        race_horse["course_track_type"] = (
-            None if "typePiste" not in course else course["typePiste"]
-        )
+        race_horse["course_condition_age"] = course.get("conditionAge")
+        race_horse["course_track_type"] = course.get("typePiste")
 
         race_horse["course_penetrometre"] = penetrometer_value
         # TODO Deal with ecurie
-        race_horse["course_corde"] = None if "corde" not in course else course["corde"]
+        race_horse["course_corde"] = course.get("corde")
         race_horse["course_hippodrome"] = (
             None
             if "hippodrome" not in course
             else course["hippodrome"]["codeHippodrome"]
         )
-        race_horse["course_parcours"] = (
-            None if "parcours" not in course else course["parcours"]
-        )
-        race_horse["course_distance"] = (
-            None if "distance" not in course else course["distance"]
-        )
-        race_horse["course_distance_unit"] = (
-            None if "distanceUnit" not in course else course["distanceUnit"]
-        )
-        race_horse["course_duration"] = (
-            None if "dureeCourse" not in course else course["dureeCourse"]
-        )
-        race_horse["course_prize_pool"] = (
-            None if "montantTotalOffert" not in course else course["montantTotalOffert"]
-        )  # TODO look at difference with "montantPrix"
-        race_horse["course_winner_prize"] = (
-            None if "montantOffert1er" not in course else course["montantOffert1er"]
-        )
+        race_horse["course_parcours"] = course.get("parcours")
+        race_horse["course_distance"] = course.get("distance")
+        race_horse["course_distance_unit"] = course.get("distanceUnit")
+        race_horse["course_duration"] = course.get("dureeCourse")
+        race_horse["course_prize_pool"] = course.get("montantTotalOffert")
+        # TODO look at difference with "montantPrix"
+        race_horse["course_winner_prize"] = course.get("montantOffert1er")
 
     return race_horses
 

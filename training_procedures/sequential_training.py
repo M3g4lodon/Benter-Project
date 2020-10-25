@@ -1,4 +1,5 @@
 from typing import Callable
+from typing import List
 from typing import Optional
 from typing import Tuple
 
@@ -9,17 +10,22 @@ import winning_validation.errors
 from utils import import_data
 from utils import permutations
 from winning_horse_models import AbstractWinningModel
+from winning_horse_models import N_FEATURES
 
 
 def train_on_each_horse_with_epochs(
     source: str,
     winning_model: AbstractWinningModel,
     n_epochs: int,
+    selected_features_index: Optional[List[int]] = None,
     extra_features_func: Optional[Callable[[pd.DataFrame], pd.DataFrame]] = None,
     verbose: bool = False,
 ) -> Tuple[AbstractWinningModel, dict]:
     """Train deep learning (tf.keras like) model of each n_horses on n_epochs.
-    Returns trained models and triaining history"""
+    Returns trained models and training history"""
+    assert len(set(selected_features_index)) == len(selected_features_index)
+    assert min(selected_features_index) >= 0
+    assert N_FEATURES > max(selected_features_index)
     min_horse, max_horse = import_data.get_min_max_horse(source=source)
     training_history = {
         "n_horses_min": min_horse,
@@ -27,6 +33,7 @@ def train_on_each_horse_with_epochs(
         "epochs": {},
         "n_horses": {},
     }
+    features_index = selected_features_index + ([-1] if extra_features_func else [])
     for epoch in range(n_epochs):
         training_history["epochs"][epoch] = {"n_horses_history": {}}
         if verbose:
@@ -41,6 +48,9 @@ def train_on_each_horse_with_epochs(
                 y_format="first_position",
                 extra_features_func=extra_features_func,
             )
+            if selected_features_index and x.size != 0:
+                x = x[:, :, features_index]
+
             x_val, y_val, _ = import_data.get_races_per_horse_number(
                 source=source,
                 n_horses=n_horses,
@@ -49,6 +59,9 @@ def train_on_each_horse_with_epochs(
                 y_format="first_position",
                 extra_features_func=extra_features_func,
             )
+            if selected_features_index and x_val.size != 0:
+                x_val = x_val[:, :, features_index]
+
             if epoch == 0:
                 training_history["n_horses"][n_horses] = {
                     "n_training_races": x.shape[0],

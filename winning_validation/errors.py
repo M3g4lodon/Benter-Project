@@ -1,13 +1,16 @@
 from typing import Callable
+from typing import List
 from typing import Optional
 from typing import Tuple
 
 import numpy as np
+import pandas as pd
 from scipy.stats import stats
 
 from utils import import_data
 from winning_horse_models import AbstractWinningModel
 from winning_horse_models import ModelNotCreatedOnceError
+from winning_horse_models import N_FEATURES
 from winning_horse_models.baselines import RandomModel
 
 
@@ -42,10 +45,15 @@ def compute_validation_error(
     k: int,
     validation_method: Callable,
     winning_model: AbstractWinningModel,
+    selected_features_index: Optional[List[int]] = None,
+    extra_features_func: Optional[Callable[[pd.DataFrame], pd.DataFrame]] = None,
     verbose: bool = False,
 ) -> dict:
     assert k > 0
-
+    assert len(set(selected_features_index)) == len(selected_features_index)
+    assert 0 <= min(selected_features_index)
+    assert N_FEATURES > max(selected_features_index)
+    features_index = selected_features_index + ([-1] if extra_features_func else [])
     min_horse, max_horse = import_data.get_min_max_horse(source=source)
     res = {
         "source": source,
@@ -73,7 +81,11 @@ def compute_validation_error(
             on_split="val",
             x_format="sequential_per_horse",
             y_format="rank",
+            extra_features_func=extra_features_func,
         )
+
+        if selected_features_index and x_race.size != 0:
+            x_race = x_race[:, :, features_index]
 
         if x_race.size == 0:
             res["n_horses_validations"][n_horses] = {"n_val_races": 0}
@@ -161,7 +173,7 @@ def compute_overall_average(
     validation_values = []
     random_values = []
     odds_values = []
-    for n_horses, validation in validation_errors["n_horses_validations"].items():
+    for validation in validation_errors["n_horses_validations"].values():
         if "validation_values" in validation:
             validation_values.append(validation["validation_values"])
             random_values.append(validation["random_validation_values"])

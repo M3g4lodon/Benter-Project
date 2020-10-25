@@ -1,13 +1,17 @@
+from typing import Callable
+from typing import List
 from typing import Optional
 from typing import Tuple
 
 import numpy as np
+import pandas as pd
 
 from constants import PMU_MINIMUM_BET_SIZE
 from utils import expected_return
 from utils import import_data
 from winning_horse_models import AbstractWinningModel
 from winning_horse_models import ModelNotCreatedOnceError
+from winning_horse_models import N_FEATURES
 from winning_horse_models.baselines import RandomModel
 
 
@@ -45,8 +49,15 @@ def compute_return_against_odds(
     source: str,
     same_races_support: bool,
     winning_model: AbstractWinningModel,
+    selected_features_index: Optional[List[int]] = None,
+    extra_features_func: Optional[Callable[[pd.DataFrame], pd.DataFrame]] = None,
     verbose: bool = False,
 ) -> dict:
+    assert len(set(selected_features_index)) == len(selected_features_index)
+    assert min(selected_features_index) >= 0
+    assert N_FEATURES > max(selected_features_index)
+
+    features_index = selected_features_index + ([-1] if extra_features_func else [])
     min_horse, max_horse = import_data.get_min_max_horse(source=source)
 
     res = {
@@ -68,7 +79,11 @@ def compute_return_against_odds(
             on_split="val",
             x_format="sequential_per_horse",
             y_format="rank",
+            extra_features_func=extra_features_func,
         )
+
+        if selected_features_index and x_race.size != 0:
+            x_race = x_race[:, :, features_index]
 
         if x_race.size == 0:
             continue

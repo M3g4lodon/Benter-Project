@@ -1,10 +1,15 @@
+from typing import Callable
 from typing import Dict
+from typing import List
+from typing import Optional
 from typing import Union
 
 import numpy as np
+import pandas as pd
 
 from utils import import_data
 from winning_horse_models import AbstractWinningModel
+from winning_horse_models import N_FEATURES
 from winning_horse_models.baselines import RandomModel
 
 
@@ -39,9 +44,16 @@ def compute_predicted_proba_on_actual_races(
     source: str,
     same_races_support: bool,
     winning_model: AbstractWinningModel,
+    selected_features_index: Optional[List[int]] = None,
+    extra_features_func: Optional[Callable[[pd.DataFrame], pd.DataFrame]] = None,
     verbose: bool = False,
 ) -> dict:
     assert k > 0
+    assert len(set(selected_features_index)) == len(selected_features_index)
+    assert 0 <= min(selected_features_index)
+    assert N_FEATURES > max(selected_features_index)
+
+    features_index = selected_features_index + ([-1] if extra_features_func else [])
 
     min_horse, max_horse = import_data.get_min_max_horse(source=source)
 
@@ -72,7 +84,11 @@ def compute_predicted_proba_on_actual_races(
             on_split="val",
             x_format="sequential_per_horse",
             y_format="rank",
+            extra_features_func=extra_features_func,
         )
+
+        if selected_features_index and x_race.size != 0:
+            x_race = x_race[:, :, features_index]
 
         if x_race.size == 0:
             continue
@@ -155,13 +171,19 @@ def compute_predicted_proba_on_actual_races(
 
 # McFadden's pseudo-R squared
 def compute_mcfadden_r_squared(
-    source: str, winning_model: AbstractWinningModel, verbose: bool = False
+    source: str,
+    winning_model: AbstractWinningModel,
+    selected_features_index: Optional[List[int]] = None,
+    extra_features_func: Optional[Callable[[pd.DataFrame], pd.DataFrame]] = None,
+    verbose: bool = False,
 ) -> Dict[str, Union[float, dict]]:
     proba_at_winning_horse = compute_predicted_proba_on_actual_races(
         k=1,
         source=source,
         same_races_support=True,
         winning_model=winning_model,
+        selected_features_index=selected_features_index,
+        extra_features_func=extra_features_func,
         verbose=verbose,
     )
 

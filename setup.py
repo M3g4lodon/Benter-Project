@@ -17,6 +17,9 @@ setuptools.setup(
     author="M3g4lodon",
     packages=setuptools.find_packages(),
     install_requires=[
+        "alembic",
+        "psycopg2",
+        "SQLAlchemy",
         "numpy",
         "pandas",
         "scikit-learn",

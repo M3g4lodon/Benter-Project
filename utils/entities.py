@@ -62,7 +62,8 @@ def get_entity_set(source: str) -> ft.EntitySet:
         "course_prize_pool",
         "course_winner_prize",
         "date",
-        "race_datetime",
+        # Not needed, raise an error on datatime not on the same timezone
+        # "race_datetime",
         "n_reunion",
         "allure",
     ]
@@ -121,6 +122,32 @@ def get_entity_set(source: str) -> ft.EntitySet:
 
     stable_df = pd.Series(train_races_df["ecurie"].unique(), name="name").reset_index()
     stable_df.rename(columns={"index": "id"}, inplace=True)
+    horse_columns = [
+        "horse_id",
+        "horse_name",
+        "horse_race",
+        "father_horse_id",
+        "father_horse_name",
+        "mother_horse_id",
+        "mother_horse_name",
+        "father_mother_horse_id",
+        "father_mother_horse_name",
+    ]
+    horse_df = train_races_df[horse_columns]
+    horse_df.rename(
+        columns={
+            "horse_name": "name",
+            "horse_id": "id",
+            "father_horse_id": "father_id",
+            "mother_horse_id": "mother_id",
+            "father_mother_horse_id": "father_mother_id",
+        },
+        inplace=True,
+    )
+    horse_df = horse_df.groupby("id").agg(
+        lambda x: np.nan if x.value_counts().size == 0 else x.value_counts().index[0]
+    )
+    horse_df.reset_index(inplace=True)
 
     horse_entity_set = ft.EntitySet("HorseEntitySet")
     horse_entity_set.entity_from_dataframe(
@@ -147,6 +174,9 @@ def get_entity_set(source: str) -> ft.EntitySet:
     horse_entity_set.entity_from_dataframe(
         entity_id="stable", dataframe=stable_df, index="id"
     )
+    horse_entity_set.entity_from_dataframe(
+        entity_id="horse", dataframe=horse_df, index="id"
+    )
     horse_entity_set.add_relationship(
         ft.Relationship(
             horse_entity_set["racetrack"]["id"],
@@ -159,6 +189,7 @@ def get_entity_set(source: str) -> ft.EntitySet:
             horse_entity_set["race"]["horse_show_id"],
         )
     )
+    # TODO horse slef relationships
 
     return horse_entity_set
 

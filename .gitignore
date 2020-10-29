@@ -141,3 +141,4 @@ cython_debug/pyt
 cache/
 data/
 saved_models/
+postgres-data/

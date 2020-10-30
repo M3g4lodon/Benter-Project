@@ -20,9 +20,20 @@ fileConfig(config.config_file_name)
 
 # add your model's MetaData object here
 # for 'autogenerate' support
-# from myapp import mymodel
-# target_metadata = mymodel.Base.metadata
-target_metadata = None
+# pylint:disable=wrong-import-position
+from models.base import Base
+from models.horse_show import HorseShow  # pylint:disable=unused-import
+from models.race_track import RaceTrack  # pylint:disable=unused-import
+from models.jockey import Jockey  # pylint:disable=unused-import
+from models.owner import Owner  # pylint:disable=unused-import
+from models.race import Race  # pylint:disable=unused-import
+from models.horse import Horse  # pylint:disable=unused-import
+from models.runner import Runner  # pylint:disable=unused-import
+from models.stable import Stable  # pylint:disable=unused-import
+from models.trainer import Trainer  # pylint:disable=unused-import
+
+# pylint:enable=wrong-import-position
+target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

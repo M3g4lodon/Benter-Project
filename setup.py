@@ -36,6 +36,8 @@ setuptools.setup(
         "hyperopt",
         "catboost",
         "featuretools",
+        "jupyter_contrib_nbextensions",
+        "jupyter_nbextensions_configurator",
     ],
     extras_require={"test": ["pytest"]},
     project_urls={"Source": "https://github.com/M3g4lodon/Benter-Project"},

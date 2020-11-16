@@ -53,6 +53,23 @@ def download_day_races(date: dt.date, replace_if_exists: bool = True) -> int:
                 utils.dump_json(data=execute_get_query(url=url), filename=filename)
                 query_count += 1
 
+            for runner in race["runners"]:
+                filename = os.path.join(
+                    day_folder_path,
+                    f"R{session['rank']}_C{race['rank']}_RN{runner['rank']}.json",
+                )
+                url = (
+                    f"https://www.unibet.fr/zones/turf/statistiques.json?"
+                    f'raceId={race["zeturfId"]}&runnerRank={runner["rank"]}'
+                )
+                if (
+                    replace_if_exists
+                    or not os.path.exists(filename)
+                    or not check_query_json(filename=filename, url=url)
+                ):
+                    utils.dump_json(data=execute_get_query(url=url), filename=filename)
+                    query_count += 1
+
     return query_count
 
 

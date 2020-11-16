@@ -39,5 +39,7 @@ def create_sqlalchemy_session():
         log.error(err)
         sqlalchemy_session.rollback()
         raise
+    else:
+        sqlalchemy_session.commit()
     finally:
         sqlalchemy_session.close()

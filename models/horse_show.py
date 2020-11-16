@@ -18,4 +18,3 @@ class HorseShow(Base):
         nullable=False,
         index=True,
     )
-    race_track = relationship("RaceTrack", back_populates="horse_shows")

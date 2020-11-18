@@ -1,0 +1,6 @@
+.PHONY: drop_and_restart_db
+drop_and_restart_db:
+	PYTHONPATH=. alembic downgrade base
+	rm -r ./alembic/versions/*
+	PYTHONPATH=. alembic revision -m  "tables_creation" --autogenerate
+	PYTHONPATH=. alembic upgrade head

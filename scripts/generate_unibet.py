@@ -6,6 +6,7 @@ from typing import Optional
 from typing import Tuple
 
 import sqlalchemy as sa
+from tqdm import tqdm
 
 from constants import UNIBET_MIN_DATE
 from database.setup import create_sqlalchemy_session
@@ -110,7 +111,7 @@ def process_horse_show(
 
     found_race_track = (
         db_session.query(RaceTrack)
-        .filter(RaceTrack.race_track_name == race_track_name)
+        .filter(RaceTrack.race_track_name == race_track_name, RaceTrack.country_name==country_name)
         .one_or_none()
     )
     if found_race_track is None:
@@ -121,7 +122,6 @@ def process_horse_show(
         db_session.commit()
         assert race_track.id
     else:
-        assert found_race_track.country_name == country_name
         assert found_race_track.id
         race_track = found_race_track
 
@@ -155,12 +155,13 @@ def process_horse_show(
 
 
 def run():
+    with create_sqlalchemy_session() as db_session:
+        for date in tqdm(date_countdown_generator(
+            start_date=UNIBET_MIN_DATE, end_date=dt.date.today() - dt.timedelta(days=1)),
+            total=(dt.date.today() - dt.timedelta(days=1)-UNIBET_MIN_DATE).days,
+            unit="days"
+        ):
 
-    for date in date_countdown_generator(
-        start_date=UNIBET_MIN_DATE, end_date=dt.date.today() - dt.timedelta(days=1)
-    ):
-
-        with create_sqlalchemy_session() as db_session:
 
             day_folder_path = os.path.join(UNIBET_DATA_PATH, date.isoformat())
             if "programme.json" in os.listdir(day_folder_path):

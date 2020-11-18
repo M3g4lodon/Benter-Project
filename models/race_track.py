@@ -13,4 +13,10 @@ class RaceTrack(Base):
     country_name = sa.Column(sa.String, nullable=False, index=True)
     horse_shows = relationship("HorseShow", backref="race_track")
 
-Index('index_track_name_country', RaceTrack.race_track_name, RaceTrack.country_name, unique=True)
+
+Index(
+    "index_track_name_country",
+    RaceTrack.race_track_name,
+    RaceTrack.country_name,
+    unique=True,
+)

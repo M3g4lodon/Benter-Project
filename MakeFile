@@ -4,3 +4,7 @@ drop_and_restart_db:
 	rm -r ./alembic/versions/*
 	PYTHONPATH=. alembic revision -m  "tables_creation" --autogenerate
 	PYTHONPATH=. alembic upgrade head
+
+.PHONY: start
+start:
+	docker-compose up --remove-orphans --build

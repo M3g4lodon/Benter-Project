@@ -1,4 +1,5 @@
 import sqlalchemy as sa
+from sqlalchemy.orm import relationship
 
 from models.base import Base
 
@@ -25,6 +26,8 @@ class Race(Base):
         nullable=False,
         index=True,
     )
+
+    runners = relationship("Runner", backref="race")
 
 
 sa.Index("race_code_index", Race.date, Race.unibet_n)

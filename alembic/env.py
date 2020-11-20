@@ -29,7 +29,6 @@ from models.owner import Owner  # pylint:disable=unused-import
 from models.race import Race  # pylint:disable=unused-import
 from models.horse import Horse  # pylint:disable=unused-import
 from models.runner import Runner  # pylint:disable=unused-import
-from models.stable import Stable  # pylint:disable=unused-import
 from models.trainer import Trainer  # pylint:disable=unused-import
 
 # pylint:enable=wrong-import-position

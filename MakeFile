@@ -1,10 +1,14 @@
-.PHONY: drop_and_restart_db
-drop_and_restart_db:
+.PHONY: downgrade_remove_generate_upgrade_migration
+downgrade_remove_generate_upgrade_migration:
 	PYTHONPATH=. alembic downgrade base
 	rm -r ./alembic/versions/*
 	PYTHONPATH=. alembic revision -m  "tables_creation" --autogenerate
 	PYTHONPATH=. alembic upgrade head
 
-.PHONY: start
-start:
+.PHONY: run_db
+run_db:
 	docker-compose up --remove-orphans --build
+
+.PHONY: jupyter_lab
+jupyter_lab:
+	jupyter lab

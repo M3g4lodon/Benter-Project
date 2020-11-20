@@ -9,3 +9,5 @@ class Jockey(Base):
 
     id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
     name = sa.Column(sa.String, unique=False, nullable=False, index=True)
+
+    runners = relationship("Runner", backref="jockey")

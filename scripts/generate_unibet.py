@@ -1,9 +1,12 @@
 import datetime as dt
 import json
 import os
+import re
 from typing import Generator
 from typing import Optional
 from typing import Tuple
+from typing import Type
+from typing import Union
 
 import sqlalchemy as sa
 from tqdm import tqdm
@@ -11,9 +14,14 @@ from tqdm import tqdm
 from constants import UNIBET_MIN_DATE
 from database.setup import create_sqlalchemy_session
 from database.setup import SQLAlchemySession
+from models.horse import Horse
 from models.horse_show import HorseShow
+from models.jockey import Jockey
+from models.owner import Owner
 from models.race import Race
 from models.race_track import RaceTrack
+from models.runner import Runner
+from models.trainer import Trainer
 
 UNIBET_DATA_PATH = "./data/Unibet"
 
@@ -82,17 +90,17 @@ class UnibetBetTRateType:
 
 class UnibetProbableType:
     # "matin cote" on simple_gagnant
-    morning_simple_gagnant_odds = 5
+    MORNING_SIMPLE_GAGNANT_ODDS = 5
 
     # "cote directe" or "rapport_final" on simple_gagnant
-    final_simple_gagnant_odds = 6
+    FINAL_SIMPLE_GAGNANT_ODDS = 6
 
-    morning_simple_place_odds = 7
-    final_simple_place_odds = 8
-    unknown_probable_type3 = 9
+    PROBABLES_1 = 7
+    PROBABLES_2 = 8
+    PROBABLES_3 = 9
 
     # "rapport_final" on deuzio
-    final_deuzio_odds = 13
+    FINAL_DEUZIO_ODDS = 13
 
 
 def date_countdown_generator(
@@ -169,16 +177,9 @@ def _get_or_create_race(  # pylint:disable=too-many-arguments, too-many-locals
 
 
 def _process_race(
-    race_dict: dict,
-    complete_race_dict: dict,
-    race_track: RaceTrack,
-    horse_show: HorseShow,
-    db_session: SQLAlchemySession,
+    current_race_dict: dict, horse_show: HorseShow, db_session: SQLAlchemySession
 ) -> Race:
-    current_race_dict = complete_race_dict
-    if complete_race_dict.get("note") == "server error, no json":
-        # Can not use complete_race
-        current_race_dict = race_dict
+
     race = _get_or_create_race(
         race_unibet_id=current_race_dict["zeturfId"],
         race_unibet_n=current_race_dict["rank"],
@@ -282,9 +283,233 @@ def _process_horse_show(
     return race_track, horse_show
 
 
+def _get_or_create_named_model(
+    name: str,
+    model_class: Union[Type[Owner], Type[Trainer], Type[Jockey]],
+    db_session: SQLAlchemySession,
+) -> Optional[Union[Owner, Trainer, Jockey]]:
+    if not name and not name.strip():
+        return None
+    found_instance = (
+        db_session.query(model_class).filter(model_class.name == name).one_or_none()
+    )
+
+    if found_instance is not None:
+        assert found_instance.id
+        return found_instance
+
+    instance = model_class(name=name)
+    db_session.add(instance)
+    db_session.commit()
+    assert instance.id
+    return instance
+
+
+def _get_or_create_runner(  # pylint:disable=too-many-arguments,too-many-locals,too-many-statements
+    unibet_id: int,
+    race: Race,
+    weight: int,
+    unibet_n: int,
+    draw: int,
+    blinkers: str,
+    shoes: str,
+    silk: str,
+    stakes: int,
+    music: str,
+    sex: str,
+    age: int,
+    coat: str,
+    origins: str,
+    comment: str,
+    length: str,
+    owner: Optional[Owner],
+    trainer: Optional[Trainer],
+    jockey: Optional[Jockey],
+    horse: Optional[Horse],
+    position: Optional[int],
+    race_duration_sec: Optional[float],
+    morning_odds: Optional[float],
+    final_odds: Optional[float],
+    db_session: SQLAlchemySession,
+) -> Runner:
+    assert race
+
+    found_runner = (
+        db_session.query(Runner).filter(Runner.unibet_id == unibet_id).one_or_none()
+    )
+
+    if found_runner is not None:
+        assert found_runner.unibet_id == unibet_id
+        assert found_runner.race_id == race.id
+        assert found_runner.weight == weight
+        assert found_runner.unibet_n == unibet_n
+        assert found_runner.draw == draw
+        assert found_runner.blinkers == blinkers
+        assert found_runner.shoes == shoes
+        assert found_runner.silk == silk
+        assert found_runner.stakes == stakes
+        assert found_runner.music == music
+        assert found_runner.sex == sex
+        assert found_runner.age == age
+        assert found_runner.coat == coat
+        assert found_runner.origins == origins
+        assert found_runner.comment == comment
+        assert found_runner.length == length
+        assert found_runner.owner_id == (owner.id if owner else None)
+        assert found_runner.trainer_id == (trainer.id if trainer else None)
+        assert found_runner.jockey_id == (jockey.id if jockey else None)
+        assert found_runner.horse_id == (horse.id if horse else None)
+        assert found_runner.position == (str(position) if position else None)
+        assert found_runner.race_duration_sec == race_duration_sec
+        assert found_runner.morning_odds == morning_odds
+        assert found_runner.final_odds == final_odds
+        assert found_runner.id
+        return found_runner
+
+    runner = Runner(
+        unibet_id=unibet_id,
+        race_id=race.id,
+        weight=weight,
+        unibet_n=unibet_n,
+        draw=draw,
+        blinkers=blinkers,
+        shoes=shoes,
+        silk=silk,
+        stakes=stakes,
+        music=music,
+        sex=sex,
+        age=age,
+        coat=coat,
+        origins=origins,
+        comment=comment,
+        length=length,
+        owner_id=owner.id if owner else None,
+        trainer_id=trainer.id if trainer else None,
+        jockey_id=jockey.id if jockey else None,
+        horse_id=horse.id if horse else None,
+        position=position,
+        race_duration_sec=race_duration_sec,
+        morning_odds=morning_odds,
+        final_odds=final_odds,
+    )
+    db_session.add(runner)
+    db_session.commit()
+    assert runner.id
+    return runner
+
+
+def _get_position(current_race_dict: dict, unibet_n: int) -> Optional[int]:
+    if "results" not in current_race_dict:
+        return None
+    if "positions" not in current_race_dict["results"]:
+        return None
+    positions = current_race_dict["results"]["positions"]
+
+    found_positions = [pos for pos in positions if unibet_n in pos["numbers"]]
+
+    assert len(found_positions) <= 1
+
+    if not found_positions:
+        return None
+
+    return found_positions[0]["position"]
+
+
+def _convert_time_in_sec(time_str: Optional[str]) -> Optional[float]:
+    if not time_str:
+        return None
+
+    matches = re.match(r"(\d{1,2})'(\d{2})''(\d{2})", time_str)
+    if not matches:
+        return None
+
+    n_min, n_sec, n_cs = matches.groups()
+    return 60 * int(n_min) + int(n_sec) + 0.01 * int(n_cs)
+
+
+def _process_runner(
+    runner_dict: dict,
+    race: Race,
+    current_race_dict: dict,
+    db_session: SQLAlchemySession,
+) -> None:
+    owner, trainer, jockey, horse = None, None, None, None
+    if runner_dict["details"]:
+        owner = _get_or_create_named_model(
+            model_class=Owner,
+            name=runner_dict["details"]["owner"],
+            db_session=db_session,
+        )
+        trainer = _get_or_create_named_model(
+            model_class=Trainer,
+            name=runner_dict["details"]["trainer"],
+            db_session=db_session,
+        )
+    jockey = _get_or_create_named_model(
+        model_class=Jockey, name=runner_dict["jockey"], db_session=db_session
+    )
+    horse = _get_or_create_named_model(
+        model_class=Horse, name=runner_dict["name"], db_session=db_session
+    )
+
+    morning_odds, final_odds = None, None
+
+    if current_race_dict.get("details") and current_race_dict["details"].get(
+        "probables"
+    ):
+        morning_odds = current_race_dict["details"]["probables"][
+            str(UnibetProbableType.MORNING_SIMPLE_GAGNANT_ODDS)
+        ].get(str(runner_dict["rank"]))
+        final_odds = current_race_dict["details"]["probables"][
+            str(UnibetProbableType.FINAL_SIMPLE_GAGNANT_ODDS)
+        ].get(str(runner_dict["rank"]))
+
+    _ = _get_or_create_runner(
+        unibet_id=runner_dict["zeturfId"],
+        race=race,
+        race_duration_sec=_convert_time_in_sec(
+            time_str=runner_dict["details"].get("time")
+        )
+        if runner_dict.get("details")
+        else None,
+        weight=runner_dict["weight"],
+        unibet_n=runner_dict["rank"],
+        draw=runner_dict["draw"],
+        blinkers=runner_dict["blinkers"],
+        shoes=runner_dict["shoes"],
+        silk=runner_dict["silk"],
+        stakes=runner_dict["details"].get("stakes")
+        if runner_dict.get("details")
+        else None,
+        music=runner_dict["details"].get("musique")
+        if runner_dict.get("details")
+        else None,
+        sex=runner_dict["details"].get("sex") if runner_dict.get("details") else None,
+        age=runner_dict["details"].get("age") if runner_dict.get("details") else None,
+        coat=runner_dict["details"].get("coat") if runner_dict.get("details") else None,
+        origins=runner_dict["details"].get("origins")
+        if runner_dict.get("details")
+        else None,
+        comment=runner_dict["details"].get("comment")
+        if runner_dict.get("details")
+        else None,
+        owner=owner,
+        trainer=trainer,
+        jockey=jockey,
+        horse=horse,
+        length=runner_dict["details"]["length"] if runner_dict.get("details") else None,
+        position=_get_position(
+            current_race_dict=current_race_dict, unibet_n=runner_dict["rank"]
+        ),
+        morning_odds=morning_odds,
+        final_odds=final_odds,
+        db_session=db_session,
+    )
+
+
 def run():
     with create_sqlalchemy_session() as db_session:
-        for date in tqdm(
+        for date in tqdm(  # pylint:disable=too-many-nested-blocks
             date_countdown_generator(
                 start_date=UNIBET_MIN_DATE,
                 end_date=dt.date.today() - dt.timedelta(days=1),
@@ -303,7 +528,7 @@ def run():
 
                 horse_shows_dict = programme["data"]
                 for horse_show_dict in horse_shows_dict:
-                    race_track, horse_show = _process_horse_show(
+                    _, horse_show = _process_horse_show(
                         horse_show_dict=horse_show_dict, db_session=db_session
                     )
 
@@ -316,13 +541,26 @@ def run():
                             )
                             with open(race_path, "r") as fp:
                                 complete_race_dict = json.load(fp=fp)
-                            _process_race(
-                                race_dict=race_dict,
-                                complete_race_dict=complete_race_dict,
-                                race_track=race_track,
+
+                            current_race_dict = complete_race_dict
+                            if (
+                                complete_race_dict.get("note")
+                                == "server error, no json"
+                            ):
+                                # Can not use complete_race
+                                current_race_dict = race_dict
+                            race = _process_race(
+                                current_race_dict=current_race_dict,
                                 horse_show=horse_show,
                                 db_session=db_session,
                             )
+                            for runner_dict in current_race_dict["runners"]:
+                                _process_runner(
+                                    runner_dict=runner_dict,
+                                    race=race,
+                                    current_race_dict=current_race_dict,
+                                    db_session=db_session,
+                                )
 
 
 if __name__ == "__main__":

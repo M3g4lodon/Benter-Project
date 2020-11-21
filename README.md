@@ -23,3 +23,4 @@ Inspired by this Bloomberg [article](https://www.bloomberg.com/news/features/201
 ---
 Appendix
 Count python file lines: `git ls-files | grep ".\.py" | xargs wc -l`
+Lexicon between French and English: https://www.lexiqueducheval.net/lexique_turf_engl.html

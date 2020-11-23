@@ -42,6 +42,7 @@ Pour un galopeur
     La lettre "H" désigne les épreuves de haies
     La lettre "C" désigne les épreuves de cross
     La lettre "P" désigne les courses de Plat
+
     La lettre "T" indique qu'il est tombé
     La lettre "A" indique qu'il a été arrêté
     La mention "RET" indique qu'il a été rétrogradé de la place
@@ -53,6 +54,7 @@ Pour un trotteur
 
     La lettre "A" désigne les épreuve de course Attelée
     La lettre "M" désigne les épreuve de course Montée
+
     La lettre "D" indique qu'il a été disqualifié pour allure irrégulière
     La lettre "T" indique qu'il est tombé
     La lettre "A" indique qu'il a été arrêté
@@ -109,50 +111,4 @@ def parse_music(music: str, verbose=False) -> ParsedMusic:
     n_races_in_music = len(events)
     return ParsedMusic(
         win_rate=win_rate, mean_place=mean_place, n_races_in_music=n_races_in_music
-    )
-
-
-# From https://github.com/pourquoi/cataclop/blob/
-# 47298c16de1def16513f78db24c4d78d697fc8ce/cataclop/ml/preprocessing.py
-
-
-def parse_cataclop_music(music, length):
-    positions = np.zeros(length)
-
-    pos = None
-    cat = None
-    is_year = False
-    i = 0
-    for c in music:
-        if i + 1 > length:
-            break
-
-        if c == "(":
-            is_year = True
-            continue
-
-        if c == ")":
-            is_year = False
-            continue
-
-        if is_year:
-            continue
-
-        if pos is None:
-            pos = c
-            cat = None
-            positions[i] = pos if pos.isdigit() else 0
-            if positions[i] == 0:
-                positions[i] = 10
-            continue
-
-        if cat is None:
-            cat = c
-            pos = None
-            i = i + 1
-            continue
-
-    return pd.Series(
-        [p for p in positions[:length]],
-        index=["hist_{:d}_pos".format(i + 1) for i in range(length)],
     )

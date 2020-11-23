@@ -323,11 +323,11 @@ def _get_or_create_runner(  # pylint:disable=too-many-arguments,too-many-locals,
     silk: str,
     stakes: int,
     music: str,
-    sex: str,
-    age: int,
+    sex: Optional[str],
+    age: Optional[str],
     coat: str,
     origins: str,
-    comment: str,
+    comment: Optional[str],
     length: str,
     owner: Optional[Owner],
     trainer: Optional[Trainer],
@@ -344,9 +344,34 @@ def _get_or_create_runner(  # pylint:disable=too-many-arguments,too-many-locals,
     found_runner = (
         db_session.query(Runner).filter(Runner.unibet_id == unibet_id).one_or_none()
     )
+    age_: Optional[int] = None
+    if age == "":
+        age_ = None
+    if age is not None and int(age) > 100:
+        age_ = None
+    elif age is not None:
+        age_ = int(age)
+    del age
+
+    if sex == "":
+        sex = None
+
+    if comment == "":
+        comment = None
+
+    if found_runner is not None and found_runner.age != age_:
+        found_runner.age = age_
+        db_session.commit()
+
+    if found_runner is not None and found_runner.sex != sex:
+        found_runner.sex = sex
+        db_session.commit()
+
+    if found_runner is not None and found_runner.comment != comment:
+        found_runner.comment = comment
+        db_session.commit()
 
     if found_runner is not None:
-        assert found_runner.unibet_id == unibet_id
         assert found_runner.race_id == race.id
         assert found_runner.weight == weight
         assert found_runner.unibet_n == unibet_n
@@ -357,7 +382,7 @@ def _get_or_create_runner(  # pylint:disable=too-many-arguments,too-many-locals,
         assert found_runner.stakes == stakes
         assert found_runner.music == music
         assert found_runner.sex == sex
-        assert found_runner.age == age
+        assert found_runner.age == age_
         assert found_runner.coat == coat
         assert found_runner.origins == origins
         assert found_runner.comment == comment
@@ -385,7 +410,7 @@ def _get_or_create_runner(  # pylint:disable=too-many-arguments,too-many-locals,
         stakes=stakes,
         music=music,
         sex=sex,
-        age=age,
+        age=age_,
         coat=coat,
         origins=origins,
         comment=comment,

@@ -23,7 +23,7 @@ class Runner(Base):
     stakes = sa.Column(sa.Integer, nullable=True, index=True)
     music = sa.Column(sa.String, nullable=True, index=True)
     sex = sa.Column(sa.String, nullable=True, index=True)
-    age = sa.Column(sa.String, nullable=True, index=True)
+    age = sa.Column(sa.Integer, nullable=True, index=True)
     coat = sa.Column(sa.String, nullable=True, index=True)
     origins = sa.Column(sa.String, nullable=True, index=True)
     comment = sa.Column(sa.String, nullable=True, index=True)

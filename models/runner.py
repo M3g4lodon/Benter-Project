@@ -60,3 +60,7 @@ class Runner(Base):
     race_duration_sec = sa.Column(sa.Float, nullable=True)
     morning_odds = sa.Column(sa.Float, nullable=True, index=True)
     final_odds = sa.Column(sa.Float, nullable=True, index=True)
+
+    @property
+    def date(self):
+        return self.race.date

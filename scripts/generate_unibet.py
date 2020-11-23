@@ -1,5 +1,6 @@
 import datetime as dt
 import json
+import logging
 import os
 import re
 from typing import Generator
@@ -24,6 +25,12 @@ from models.runner import Runner
 from models.trainer import Trainer
 
 UNIBET_DATA_PATH = "./data/Unibet"
+
+logger = logging.getLogger(__name__)
+handler = logging.StreamHandler()
+formatter = logging.Formatter("%(asctime)s %(name)-12s %(levelname)-8s %(message)s")
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
 
 class UnibetBetTRateType:
@@ -507,9 +514,9 @@ def _process_runner(
     )
 
 
-def run():
+def run():  # pylint:disable=too-many-branches
     with create_sqlalchemy_session() as db_session:
-        for date in tqdm(  # pylint:disable=too-many-nested-blocks
+        for date in tqdm(
             date_countdown_generator(
                 start_date=UNIBET_MIN_DATE,
                 end_date=dt.date.today() - dt.timedelta(days=1),
@@ -517,50 +524,54 @@ def run():
             total=(dt.date.today() - dt.timedelta(days=1) - UNIBET_MIN_DATE).days,
             unit="days",
         ):
-
+            if not date.isoformat() in os.listdir(UNIBET_DATA_PATH):
+                logger.info("Could not find folder for date: %s", date.isoformat())
+                continue
             day_folder_path = os.path.join(UNIBET_DATA_PATH, date.isoformat())
-            if "programme.json" in os.listdir(day_folder_path):
-                with open(os.path.join(day_folder_path, "programme.json"), "r") as fp:
-                    programme = json.load(fp=fp)
-                if "data" not in programme:
-                    print(f"Can not import programme of {date.isoformat()}")
-                    continue
+            if "programme.json" not in os.listdir(day_folder_path):
+                logger.info(
+                    "Could not find programme.json for date: %s", date.isoformat()
+                )
+                continue
 
-                horse_shows_dict = programme["data"]
-                for horse_show_dict in horse_shows_dict:
-                    _, horse_show = _process_horse_show(
-                        horse_show_dict=horse_show_dict, db_session=db_session
-                    )
+            with open(os.path.join(day_folder_path, "programme.json"), "r") as fp:
+                programme = json.load(fp=fp)
+            if "data" not in programme:
+                logger.info("Can not import programme of %s", date.isoformat())
+                continue
 
-                    if horse_show_dict.get("races"):
+            horse_shows_dict = programme["data"]
+            for horse_show_dict in horse_shows_dict:
+                _, horse_show = _process_horse_show(
+                    horse_show_dict=horse_show_dict, db_session=db_session
+                )
 
-                        for race_dict in horse_show_dict["races"]:
-                            race_path = os.path.join(
-                                day_folder_path,
-                                f"R{horse_show.unibet_n}_C" f"{race_dict['rank']}.json",
-                            )
-                            with open(race_path, "r") as fp:
-                                complete_race_dict = json.load(fp=fp)
+                if horse_show_dict.get("races"):
 
-                            current_race_dict = complete_race_dict
-                            if (
-                                complete_race_dict.get("note")
-                                == "server error, no json"
-                            ):
-                                # Can not use complete_race
-                                current_race_dict = race_dict
-                            race = _process_race(
+                    for race_dict in horse_show_dict["races"]:
+                        race_path = os.path.join(
+                            day_folder_path,
+                            f"R{horse_show.unibet_n}_C" f"{race_dict['rank']}.json",
+                        )
+                        with open(race_path, "r") as fp:
+                            complete_race_dict = json.load(fp=fp)
+
+                        current_race_dict = complete_race_dict
+                        if complete_race_dict.get("note") == "server error, no json":
+                            # Can not use complete_race
+                            current_race_dict = race_dict
+                        race = _process_race(
+                            current_race_dict=current_race_dict,
+                            horse_show=horse_show,
+                            db_session=db_session,
+                        )
+                        for runner_dict in current_race_dict["runners"]:
+                            _process_runner(
+                                runner_dict=runner_dict,
+                                race=race,
                                 current_race_dict=current_race_dict,
-                                horse_show=horse_show,
                                 db_session=db_session,
                             )
-                            for runner_dict in current_race_dict["runners"]:
-                                _process_runner(
-                                    runner_dict=runner_dict,
-                                    race=race,
-                                    current_race_dict=current_race_dict,
-                                    db_session=db_session,
-                                )
 
 
 if __name__ == "__main__":

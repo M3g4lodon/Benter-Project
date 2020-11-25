@@ -459,6 +459,30 @@ def _convert_time_in_sec(time_str: Optional[str]) -> Optional[float]:
     return 60 * int(n_min) + int(n_sec) + 0.01 * int(n_cs)
 
 
+def _get_or_create_horse(name_country: str, db_session: SQLAlchemySession) -> Horse:
+
+    name = re.sub(r"\s\(.*\)", "", name_country)
+    country_code = re.sub(r"\)", "", re.sub(r".*\(", "", name_country))
+    assert name
+    assert country_code
+    found_horse = (
+        db_session.query(Horse)
+        .filter(Horse.name == name, Horse.country_code == country_code)
+        .one_or_none()
+    )
+    # TODO find by origins
+
+    if found_horse is not None:
+        assert found_horse.id
+        return found_horse
+
+    horse = Horse(name=name, country_code=country_code)
+    db_session.add(horse)
+    db_session.commit()
+    assert horse.id
+    return horse
+
+
 def _process_runner(
     runner_dict: dict,
     race: Race,
@@ -480,8 +504,8 @@ def _process_runner(
     jockey = _get_or_create_named_model(
         model_class=Jockey, name=runner_dict["jockey"], db_session=db_session
     )
-    horse = _get_or_create_named_model(
-        model_class=Horse, name=runner_dict["name"], db_session=db_session
+    horse = _get_or_create_horse(
+        name_country=runner_dict["name"], db_session=db_session
     )
 
     morning_odds, final_odds = None, None

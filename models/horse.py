@@ -9,5 +9,10 @@ class Horse(Base):
 
     id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
     name = sa.Column(sa.String, unique=False, nullable=False, index=True)
+    country_code = sa.Column(sa.String, nullable=True, index=True)
 
     runners = relationship("Runner", backref="horse")
+
+
+# TODO add constraint on name + origins
+# TODO check that name are uppercased

@@ -1,5 +1,14 @@
+from typing import Optional
+
 import sqlalchemy as sa
 
+from constants import UnibetHorseSex
+from database.setup import SQLAlchemySession
+from models import Horse
+from models import Jockey
+from models import Owner
+from models import Race
+from models import Trainer
 from models.base import Base
 
 
@@ -22,11 +31,11 @@ class Runner(Base):
     silk = sa.Column(sa.String, nullable=True, index=True)
     stakes = sa.Column(sa.Integer, nullable=True, index=True)
     music = sa.Column(sa.String, nullable=True, index=True)
-    sex = sa.Column(sa.String, nullable=True, index=True)
+    sex = sa.Column(sa.Enum(UnibetHorseSex), nullable=True, index=True)
     age = sa.Column(sa.Integer, nullable=True, index=True)
     coat = sa.Column(sa.String, nullable=True, index=True)
-    origins = sa.Column(sa.String, nullable=True, index=True)
-    comment = sa.Column(sa.String, nullable=True, index=True)
+    origins = sa.Column(sa.String, nullable=True, index=False)
+    comment = sa.Column(sa.String, nullable=True, index=False)
     length = sa.Column(sa.String, nullable=True, index=True)
 
     owner_id = sa.Column(
@@ -64,3 +73,122 @@ class Runner(Base):
     @property
     def date(self):
         return self.race.date
+
+    @classmethod
+    def upsert(
+        cls,
+        unibet_id: int,
+        race: Race,
+        weight: int,
+        unibet_n: int,
+        draw: int,
+        blinkers: str,
+        shoes: str,
+        silk: str,
+        stakes: int,
+        music: str,
+        sex: Optional[str],
+        age: Optional[str],
+        coat: str,
+        origins: str,
+        comment: Optional[str],
+        length: str,
+        owner: Optional[Owner],
+        trainer: Optional[Trainer],
+        jockey: Optional[Jockey],
+        horse: Optional[Horse],
+        position: Optional[int],
+        race_duration_sec: Optional[float],
+        morning_odds: Optional[float],
+        final_odds: Optional[float],
+        db_session: SQLAlchemySession,
+    ) -> "Runner":
+        assert race
+
+        found_runner = (
+            db_session.query(Runner).filter(Runner.unibet_id == unibet_id).one_or_none()
+        )
+        age_: Optional[int] = None
+        if age == "":
+            age_ = None
+        elif age is not None and int(age) > 100:
+            age_ = None
+        elif age is not None:
+            age_ = int(age)
+        del age
+
+        if sex == "":
+            sex = None
+
+        if comment == "":
+            comment = None
+
+        if found_runner is not None and found_runner.age != age_:
+            found_runner.age = age_
+            db_session.commit()
+
+        if found_runner is not None and found_runner.sex != UnibetHorseSex(sex):
+            found_runner.sex = UnibetHorseSex(sex)
+            db_session.commit()
+
+        if found_runner is not None and found_runner.comment != comment:
+            found_runner.comment = comment
+            db_session.commit()
+
+        if found_runner is not None:
+            assert found_runner.race_id == race.id
+            assert found_runner.weight == weight
+            assert found_runner.unibet_n == unibet_n
+            assert found_runner.draw == draw
+            assert found_runner.blinkers == blinkers
+            assert found_runner.shoes == shoes
+            assert found_runner.silk == silk
+            assert found_runner.stakes == stakes
+            assert found_runner.music == music
+            assert found_runner.sex == UnibetHorseSex(sex)
+            assert found_runner.age == age_
+            assert found_runner.coat == coat
+            assert found_runner.origins == origins
+            assert found_runner.comment == comment
+            assert found_runner.length == length
+            assert found_runner.owner_id == (owner.id if owner else None)
+            assert found_runner.trainer_id == (trainer.id if trainer else None)
+            assert found_runner.jockey_id == (jockey.id if jockey else None)
+            assert found_runner.horse_id == (horse.id if horse else None)
+            assert found_runner.position == (str(position) if position else None)
+            assert found_runner.race_duration_sec == race_duration_sec
+            assert found_runner.morning_odds == morning_odds
+            assert found_runner.final_odds == final_odds
+            assert found_runner.id
+            return found_runner
+
+        runner = Runner(
+            unibet_id=unibet_id,
+            race_id=race.id,
+            weight=weight,
+            unibet_n=unibet_n,
+            draw=draw,
+            blinkers=blinkers,
+            shoes=shoes,
+            silk=silk,
+            stakes=stakes,
+            music=music,
+            sex=UnibetHorseSex(sex),
+            age=age_,
+            coat=coat,
+            origins=origins,
+            comment=comment,
+            length=length,
+            owner_id=owner.id if owner else None,
+            trainer_id=trainer.id if trainer else None,
+            jockey_id=jockey.id if jockey else None,
+            horse_id=horse.id if horse else None,
+            position=position,
+            race_duration_sec=race_duration_sec,
+            morning_odds=morning_odds,
+            final_odds=final_odds,
+        )
+        db_session.add(runner)
+        db_session.commit()
+        assert runner.id
+        return runner

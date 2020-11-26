@@ -1,8 +1,8 @@
-"""tables_creation
+"""create_tables
 
-Revision ID: f1c86649e545
+Revision ID: c99be14b1d5e
 Revises:
-Create Date: 2020-11-20 17:01:10.717785
+Create Date: 2020-11-30 11:33:25.043177
 
 """
 import sqlalchemy as sa
@@ -11,7 +11,7 @@ from alembic import op
 
 
 # revision identifiers, used by Alembic.
-revision = "f1c86649e545"
+revision = "c99be14b1d5e"
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -23,8 +23,28 @@ def upgrade():
         "horses",
         sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
         sa.Column("name", sa.String(), nullable=False),
+        sa.Column("country_code", sa.String(), nullable=True),
+        sa.Column("is_born_male", sa.Boolean(), nullable=True),
+        sa.Column("father_id", sa.Integer(), nullable=True),
+        sa.Column("mother_id", sa.Integer(), nullable=True),
+        sa.ForeignKeyConstraint(["father_id"], ["horses.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["mother_id"], ["horses.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
+    op.create_index(
+        "horse_name_parents_index",
+        "horses",
+        ["name", "father_id", "mother_id"],
+        unique=True,
+    )
+    op.create_index(
+        op.f("ix_horses_country_code"), "horses", ["country_code"], unique=False
+    )
+    op.create_index(op.f("ix_horses_father_id"), "horses", ["father_id"], unique=False)
+    op.create_index(
+        op.f("ix_horses_is_born_male"), "horses", ["is_born_male"], unique=False
+    )
+    op.create_index(op.f("ix_horses_mother_id"), "horses", ["mother_id"], unique=False)
     op.create_index(op.f("ix_horses_name"), "horses", ["name"], unique=False)
     op.create_table(
         "jockeys",
@@ -141,8 +161,12 @@ def upgrade():
         sa.Column("silk", sa.String(), nullable=True),
         sa.Column("stakes", sa.Integer(), nullable=True),
         sa.Column("music", sa.String(), nullable=True),
-        sa.Column("sex", sa.String(), nullable=True),
-        sa.Column("age", sa.String(), nullable=True),
+        sa.Column(
+            "sex",
+            sa.Enum("MALE", "FEMALE", "GELDING", "UNKNOWN", name="unibethorsesex"),
+            nullable=True,
+        ),
+        sa.Column("age", sa.Integer(), nullable=True),
         sa.Column("coat", sa.String(), nullable=True),
         sa.Column("origins", sa.String(), nullable=True),
         sa.Column("comment", sa.String(), nullable=True),
@@ -165,7 +189,6 @@ def upgrade():
     op.create_index(op.f("ix_runners_age"), "runners", ["age"], unique=False)
     op.create_index(op.f("ix_runners_blinkers"), "runners", ["blinkers"], unique=False)
     op.create_index(op.f("ix_runners_coat"), "runners", ["coat"], unique=False)
-    op.create_index(op.f("ix_runners_comment"), "runners", ["comment"], unique=False)
     op.create_index(op.f("ix_runners_draw"), "runners", ["draw"], unique=False)
     op.create_index(
         op.f("ix_runners_final_odds"), "runners", ["final_odds"], unique=False
@@ -179,7 +202,6 @@ def upgrade():
         op.f("ix_runners_morning_odds"), "runners", ["morning_odds"], unique=False
     )
     op.create_index(op.f("ix_runners_music"), "runners", ["music"], unique=False)
-    op.create_index(op.f("ix_runners_origins"), "runners", ["origins"], unique=False)
     op.create_index(op.f("ix_runners_owner_id"), "runners", ["owner_id"], unique=False)
     op.create_index(op.f("ix_runners_position"), "runners", ["position"], unique=False)
     op.create_index(op.f("ix_runners_race_id"), "runners", ["race_id"], unique=False)
@@ -209,7 +231,6 @@ def downgrade():
     op.drop_index(op.f("ix_runners_race_id"), table_name="runners")
     op.drop_index(op.f("ix_runners_position"), table_name="runners")
     op.drop_index(op.f("ix_runners_owner_id"), table_name="runners")
-    op.drop_index(op.f("ix_runners_origins"), table_name="runners")
     op.drop_index(op.f("ix_runners_music"), table_name="runners")
     op.drop_index(op.f("ix_runners_morning_odds"), table_name="runners")
     op.drop_index(op.f("ix_runners_length"), table_name="runners")
@@ -217,7 +238,6 @@ def downgrade():
     op.drop_index(op.f("ix_runners_horse_id"), table_name="runners")
     op.drop_index(op.f("ix_runners_final_odds"), table_name="runners")
     op.drop_index(op.f("ix_runners_draw"), table_name="runners")
-    op.drop_index(op.f("ix_runners_comment"), table_name="runners")
     op.drop_index(op.f("ix_runners_coat"), table_name="runners")
     op.drop_index(op.f("ix_runners_blinkers"), table_name="runners")
     op.drop_index(op.f("ix_runners_age"), table_name="runners")
@@ -244,5 +264,12 @@ def downgrade():
     op.drop_index(op.f("ix_jockeys_name"), table_name="jockeys")
     op.drop_table("jockeys")
     op.drop_index(op.f("ix_horses_name"), table_name="horses")
+    op.drop_index(op.f("ix_horses_mother_id"), table_name="horses")
+    op.drop_index(op.f("ix_horses_is_born_male"), table_name="horses")
+    op.drop_index(op.f("ix_horses_father_id"), table_name="horses")
+    op.drop_index(op.f("ix_horses_country_code"), table_name="horses")
+    op.drop_index("horse_name_parents_index", table_name="horses")
     op.drop_table("horses")
     # ### end Alembic commands ###
+
+    op.execute("DROP TYPE unibethorsesex;")

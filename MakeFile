@@ -2,11 +2,13 @@
 downgrade_remove_generate_upgrade_migration:
 	PYTHONPATH=. alembic downgrade base
 	rm -r ./alembic/versions/*
-	PYTHONPATH=. alembic revision -m  "tables_creation" --autogenerate
+	PYTHONPATH=. alembic revision -m  "create_tables" --autogenerate
 	PYTHONPATH=. alembic upgrade head
 
 .PHONY: run_db
 run_db:
+	stop_pg_10
+	stop_pg_11
 	docker-compose up --remove-orphans --build
 
 .PHONY: jupyter_lab

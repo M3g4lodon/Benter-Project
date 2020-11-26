@@ -20,11 +20,6 @@ repos:
     hooks:
       - id: reorder-python-imports
         language_version: python3.7
-        # NOTE: if we use this option the lib will not see the folder
-        # "metricsystem", treating it like a third-party library instead
-        # of separating in the last section as it should be.
-        # args:
-        #   - --application-directories=./metricsystem
 
   - repo: https://github.com/asottile/blacken-docs
     rev: v1.3.0

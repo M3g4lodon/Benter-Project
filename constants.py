@@ -1,6 +1,7 @@
 import collections
 import datetime as dt
 import os
+from enum import Enum
 
 TIMEZONE = "Europe/Paris"
 
@@ -109,3 +110,87 @@ PMU_MINIMUM_BET_SIZE = 150  # 1.50€
 
 # Unibet
 UNIBET_MIN_DATE = dt.date(2005, 6, 18)
+
+
+class UnibetHorseSex(Enum):
+    MALE = "M"
+    FEMALE = "F"
+    GELDING = "H"  # "hongre" in French
+    UNKNOWN = None
+
+
+class UnibetBetTRateType:
+    """As of Nov 27th 2020, found in Unibet JS code"""
+
+    # Mise de base: 1€<br>Trouvez le 1er cheval de l’arrivée.
+    SIMPLE_WINNER = 1
+
+    # "Mise de base: 1€<br>Trouvez 1 cheval parmi les 3 premiers sur les courses de 8
+    # chevaux et plus OU 1 cheval parmi les 2 premiers sur les courses de 4 à 7 chevaux.
+    SIMPLE_PLACED = 2
+
+    # Mise de base: 1€<br>Trouvez les 2 premiers chevaux dans l’ordre ou le désordre.
+    JUMELE_WINNER = 3
+
+    # Mise de base: 1€<br>Trouvez les 2 premiers chevaux dans l’ordre.
+    JUMELE_ORDER = 4
+
+    # Mise de base: 1€<br>Trouvez 2 chevaux parmi les 3 premiers à l’arrivée.
+    JUMELE_PLACED = 5
+
+    # Mise de base: 1€<br>Trouvez les 3 premiers chevaux.
+    TRIO = 6
+
+    # Mise de base: 1€<br>Trouvez le cheval qui arrive à la 4ème place.
+    LEBOULET = 7
+
+    # Mise de base: 0.50€<br>Trouvez les 4 premiers chevaux, dans l’ordre ou le
+    # désordre.
+    QUADRI = 8
+
+    # Mise de base: 1€<br>Trouvez les 3 premiers chevaux dans l'ordre.
+    TRIO_ORDER = 11
+
+    # Mise de base: 0.50€<br>Trouvez les 5 premiers chevaux, dans l’ordre ou le
+    # désordre.
+    FIVE_OVER_FIVE = 12
+
+    # Mise de base: 1€<br>Trouvez 2 chevaux parmi les 4 premiers à l’arrivée.
+    TWO_OVER_FOUR = 13
+
+    # Mise de base: 1€<br>Trouvez le cheval qui arrive à la 2ème place
+    DEUZIO = 29
+
+    # Mise de base : 1.50€<br>Mixez dans un même betslip: un Quadri + des Trios + des
+    # Jumelés Gagnants.
+    MIX_FOUR = 15
+
+    # Mise de base: 2€<br>Mixez dans un même betslip: un 5 sur 5 + des Quadris + des
+    # Trios.
+    MIX_FIVE = 16
+
+    # Mise de base: 3€<br>Mixez dans un même betslip: un Simple Gagnant + un Simple
+    # Placé + un Deuzio + un Boulet
+    MIX_S = 31
+
+    # Mise de base: 1€<br>Trouvez les 2 premiers chevaux à l’arrivée dans l’ordre ou
+    # le désordre.
+    JUMELE = 32
+
+    # Mise de base: 1€<br>Trouvez le 1er cheval à l’arrivée gagnant ou placé.
+    SIMPLE = 33
+
+
+class UnibetProbableType:
+    # "matin cote" on simple_gagnant
+    MORNING_SIMPLE_GAGNANT_ODDS = 5
+
+    # "cote directe" or "rapport_final" on simple_gagnant
+    FINAL_SIMPLE_GAGNANT_ODDS = 6
+
+    PROBABLES_1 = 7
+    PROBABLES_2 = 8
+    PROBABLES_3 = 9
+
+    # "rapport_final" on deuzio
+    FINAL_DEUZIO_ODDS = 13

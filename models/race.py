@@ -1,6 +1,10 @@
+import datetime as dt
+
 import sqlalchemy as sa
 from sqlalchemy.orm import relationship
 
+from database.setup import SQLAlchemySession
+from models import HorseShow
 from models.base import Base
 
 
@@ -28,6 +32,68 @@ class Race(Base):
     )
 
     runners = relationship("Runner", backref="race")
+
+    @classmethod
+    def upsert(
+        cls,
+        race_unibet_id: int,
+        race_unibet_n: int,
+        race_name: str,
+        race_start_at: dt.datetime,
+        race_date: dt.date,
+        race_type: str,
+        race_conditions: str,
+        race_stake: int,
+        race_arjel_level: str,
+        race_distance: int,
+        race_friendly_url: str,
+        race_pronostic: str,
+        horse_show: HorseShow,
+        db_session: SQLAlchemySession,
+    ) -> "Race":
+
+        found_race = (
+            db_session.query(Race)
+            .filter(Race.unibet_id == race_unibet_id)
+            .one_or_none()
+        )
+        if found_race is not None:
+            assert found_race.unibet_id == race_unibet_id
+            assert found_race.name == race_name
+            assert found_race.start_at == race_start_at
+            assert found_race.date == race_date
+            assert found_race.unibet_n == race_unibet_n
+            assert found_race.type == race_type
+            assert found_race.conditions == race_conditions
+            assert found_race.stake == race_stake
+            assert found_race.arjel_level == race_arjel_level
+            assert found_race.distance == race_distance
+            assert found_race.friendly_URL == race_friendly_url
+            assert found_race.pronostic == race_pronostic
+            assert found_race.horse_show_id == horse_show.id
+            assert found_race.id
+            return found_race
+
+        race = Race(
+            unibet_id=race_unibet_id,
+            name=race_name,
+            start_at=race_start_at,
+            date=race_date,
+            unibet_n=race_unibet_n,
+            type=race_type,
+            conditions=race_conditions,
+            stake=race_stake,
+            arjel_level=race_arjel_level,
+            distance=race_distance,
+            friendly_URL=race_friendly_url,
+            pronostic=race_pronostic,
+            horse_show_id=horse_show.id,
+        )
+        db_session.add(race)
+        db_session.commit()
+
+        assert race.id
+        return race
 
 
 sa.Index("race_code_index", Race.date, Race.unibet_n)

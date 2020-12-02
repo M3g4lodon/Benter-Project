@@ -10,6 +10,9 @@ from constants import SOURCE_PMU
 from constants import SOURCE_Unibet
 from constants import SOURCES
 from constants import UNIBET_DATA_DIR
+from utils.logger import setup_logger
+
+logger = setup_logger(__name__)
 
 
 def dump_json(data: dict, filename: str) -> None:
@@ -50,7 +53,13 @@ def convert_duration_in_sec(time_str: Optional[str]) -> Optional[float]:
         return None
 
     matches = re.match(r"(\d{1,2})'(\d{2})''(\d{2})", time_str)
+    matches = (
+        re.match(r"""(\d{1,2})'(\d{2})"(\d{2})""", time_str)
+        if matches is None
+        else matches
+    )
     if not matches:
+        logger.warning("Could not convert %s in duration", time_str)
         return None
 
     n_min, n_sec, n_cs = matches.groups()

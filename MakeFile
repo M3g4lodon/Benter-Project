@@ -7,8 +7,6 @@ downgrade_remove_generate_upgrade_migration:
 
 .PHONY: run_db
 run_db:
-	stop_pg_10
-	stop_pg_11
 	docker-compose up --remove-orphans --build
 
 .PHONY: jupyter_lab

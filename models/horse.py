@@ -1,15 +1,12 @@
 import logging
-import re
 from typing import List
 from typing import Optional
-from typing import Tuple
 
 import sqlalchemy as sa
 from sqlalchemy.orm import relationship
 from sqlalchemy.orm import validates
 
 from database.setup import SQLAlchemySession
-from models import Race
 from models.base import Base
 
 logger = logging.getLogger(__file__)
@@ -23,6 +20,8 @@ class Horse(Base):
     country_code = sa.Column(sa.String, nullable=True, index=True)
     is_born_male = sa.Column(sa.Boolean, nullable=True, index=True)
     runners = relationship("Runner", backref="horse")
+    first_found_origins = sa.Column(sa.String, nullable=True, index=False)
+    birth_year = sa.Column(sa.Integer, nullable=True, index=True)
     father_id = sa.Column(
         sa.Integer,
         sa.ForeignKey("horses.id", ondelete="CASCADE"),
@@ -45,6 +44,7 @@ class Horse(Base):
     @validates("name")
     def validate_name(self, key, value: str) -> str:
         assert value.upper() == value
+        assert value
         return value
 
     @property
@@ -62,6 +62,8 @@ class Horse(Base):
         country_code: Optional[str],
         father: Optional["Horse"],
         mother: Optional["Horse"],
+        origins: Optional[str],
+        birth_year: Optional[int],
         db_session: SQLAlchemySession,
     ) -> "Horse":
         if found_horse.country_code is None and country_code:
@@ -72,6 +74,10 @@ class Horse(Base):
             found_horse.mother_id = mother.id
         if found_horse.is_born_male is None and is_born_male is not None:
             found_horse.is_born_male = is_born_male
+        if found_horse.first_found_origins is None and origins:
+            found_horse.first_found_origins = origins
+        if found_horse.birth_year is None and birth_year:
+            found_horse.birth_year = birth_year
 
         assert found_horse.name
         if country_code:
@@ -82,6 +88,10 @@ class Horse(Base):
             assert found_horse.mother_id == mother.id
         if is_born_male is not None:
             assert found_horse.is_born_male == is_born_male
+        # No checks on first_found_origins
+        if birth_year:
+            assert found_horse.birth_year == birth_year
+
         db_session.commit()
         return found_horse
 
@@ -93,11 +103,13 @@ class Horse(Base):
         country_code: Optional[str],
         father: Optional["Horse"],
         mother: Optional["Horse"],
+        origins: Optional[str],
+        birth_year: Optional[int],
         db_session: SQLAlchemySession,
     ) -> Optional["Horse"]:
         potential_horses = db_session.query(Horse).filter(Horse.name == name).all()
 
-        # TODO filter on age according to previous races
+        # TODO filter on age according to previous races (approximate birth year), same origins
 
         if is_born_male is not None:
             potential_horses = [
@@ -126,9 +138,15 @@ class Horse(Base):
                 for horse in potential_horses
                 if horse.mother_id == mother.id or horse.mother_id is None
             ]
+        if len(potential_horses) > 1 and origins:
+            potential_horses = [
+                horse
+                for horse in potential_horses
+                if horse.first_found_origins == origins
+            ]
 
         if len(potential_horses) > 1:
-            logger.debug("Too many horses found!")
+            logger.warning("Too many horses found!")
             return None
         if len(potential_horses) == 1:
             found_horse = potential_horses[0]
@@ -138,6 +156,8 @@ class Horse(Base):
                 country_code=country_code,
                 father=father,
                 mother=mother,
+                origins=origins,
+                birth_year=birth_year,
                 db_session=db_session,
             )
 
@@ -146,91 +166,14 @@ class Horse(Base):
             country_code=country_code,
             father_id=father.id if father else None,
             mother_id=mother.id if mother else None,
+            first_found_origins=origins,
+            birth_year=birth_year,
             is_born_male=is_born_male,
         )
         db_session.add(horse)
         db_session.commit()
         assert horse.id
         return horse
-
-    @classmethod
-    def upsert_father_mother(  # pylint:disable=too-many-branches
-        cls,
-        current_horse_age: Optional[int],
-        race: Race,
-        father_mother_names: Optional[str],
-        db_session: SQLAlchemySession,
-    ) -> Tuple[Optional["Horse"], Optional["Horse"]]:
-        if not father_mother_names:
-            return None, None
-        father_mother_names = re.split("[-/]", father_mother_names)
-        if len(father_mother_names) != 2:
-            logger.debug(
-                "Could not find father mother names in origins: %s", father_mother_names
-            )
-            return None, None
-
-        father_name, mother_name = father_mother_names
-        father_name = father_name.upper()
-        mother_name = mother_name.upper()
-
-        potential_fathers = (
-            db_session.query(Horse)
-            .filter(Horse.name == father_name, Horse.is_born_male.is_(True))
-            .all()
-        )
-
-        # TODO don't be too strict on is_born_male, update it the found horse
-        # Fathers needs to be older than their children
-        if current_horse_age:
-            potential_fathers = [
-                potential_father
-                for potential_father in potential_fathers
-                if all(
-                    f_rn.race.date.year - f_rn.age <= race.date.year - current_horse_age
-                    for f_rn in potential_father.runners
-                )
-            ]
-
-        if not potential_fathers:
-            father: Optional["Horse"] = Horse(name=father_name, is_born_male=True)
-            db_session.add(father)
-            db_session.commit()
-        elif len(potential_fathers) == 1:
-            father = potential_fathers[0]
-        else:
-            assert len(potential_fathers) > 1
-            logger.debug("Too many fathers found!")
-            father = None
-
-        potential_mothers = (
-            db_session.query(Horse)
-            .filter(Horse.name == mother_name, Horse.is_born_male.is_(False))
-            .all()
-        )
-        # TODO don't be too strict on is_born_male, update it the found horse
-        # Mothers needs to be older than their children
-        if current_horse_age:
-            potential_mothers = [
-                potential_mother
-                for potential_mother in potential_mothers
-                if all(
-                    m_rn.race.date.year - m_rn.age <= race.date.year - current_horse_age
-                    for m_rn in potential_mother.runners
-                )
-            ]
-
-        if not potential_mothers:
-            mother: Optional["Horse"] = Horse(name=mother_name, is_born_male=False)
-            db_session.add(mother)
-            db_session.commit()
-        elif len(potential_mothers) == 1:
-            mother = potential_mothers[0]
-        else:
-            assert len(potential_mothers) > 1
-            logger.debug("Too many mothers found!")
-            mother = None
-        return father, mother
 
 
 sa.Index(

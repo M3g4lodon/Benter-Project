@@ -1,8 +1,8 @@
 """create_tables
 
-Revision ID: c99be14b1d5e
+Revision ID: ce6400b6ef6c
 Revises:
-Create Date: 2020-11-30 11:33:25.043177
+Create Date: 2020-12-03 09:30:12.141449
 
 """
 import sqlalchemy as sa
@@ -11,7 +11,7 @@ from alembic import op
 
 
 # revision identifiers, used by Alembic.
-revision = "c99be14b1d5e"
+revision = "ce6400b6ef6c"
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -25,6 +25,8 @@ def upgrade():
         sa.Column("name", sa.String(), nullable=False),
         sa.Column("country_code", sa.String(), nullable=True),
         sa.Column("is_born_male", sa.Boolean(), nullable=True),
+        sa.Column("first_found_origins", sa.String(), nullable=True),
+        sa.Column("birth_year", sa.Integer(), nullable=True),
         sa.Column("father_id", sa.Integer(), nullable=True),
         sa.Column("mother_id", sa.Integer(), nullable=True),
         sa.ForeignKeyConstraint(["father_id"], ["horses.id"], ondelete="CASCADE"),
@@ -36,6 +38,9 @@ def upgrade():
         "horses",
         ["name", "father_id", "mother_id"],
         unique=True,
+    )
+    op.create_index(
+        op.f("ix_horses_birth_year"), "horses", ["birth_year"], unique=False
     )
     op.create_index(
         op.f("ix_horses_country_code"), "horses", ["country_code"], unique=False
@@ -155,6 +160,7 @@ def upgrade():
         sa.Column("race_id", sa.Integer(), nullable=False),
         sa.Column("weight", sa.Float(), nullable=True),
         sa.Column("unibet_n", sa.Integer(), nullable=False),
+        sa.Column("rope_n", sa.Integer(), nullable=True),
         sa.Column("draw", sa.Integer(), nullable=True),
         sa.Column("blinkers", sa.String(), nullable=True),
         sa.Column("shoes", sa.String(), nullable=True),
@@ -171,6 +177,7 @@ def upgrade():
         sa.Column("origins", sa.String(), nullable=True),
         sa.Column("comment", sa.String(), nullable=True),
         sa.Column("length", sa.String(), nullable=True),
+        sa.Column("kilometer_record_sec", sa.Float(), nullable=True),
         sa.Column("owner_id", sa.Integer(), nullable=True),
         sa.Column("trainer_id", sa.Integer(), nullable=True),
         sa.Column("jockey_id", sa.Integer(), nullable=True),
@@ -197,6 +204,12 @@ def upgrade():
     op.create_index(
         op.f("ix_runners_jockey_id"), "runners", ["jockey_id"], unique=False
     )
+    op.create_index(
+        op.f("ix_runners_kilometer_record_sec"),
+        "runners",
+        ["kilometer_record_sec"],
+        unique=False,
+    )
     op.create_index(op.f("ix_runners_length"), "runners", ["length"], unique=False)
     op.create_index(
         op.f("ix_runners_morning_odds"), "runners", ["morning_odds"], unique=False
@@ -205,6 +218,7 @@ def upgrade():
     op.create_index(op.f("ix_runners_owner_id"), "runners", ["owner_id"], unique=False)
     op.create_index(op.f("ix_runners_position"), "runners", ["position"], unique=False)
     op.create_index(op.f("ix_runners_race_id"), "runners", ["race_id"], unique=False)
+    op.create_index(op.f("ix_runners_rope_n"), "runners", ["rope_n"], unique=False)
     op.create_index(op.f("ix_runners_sex"), "runners", ["sex"], unique=False)
     op.create_index(op.f("ix_runners_shoes"), "runners", ["shoes"], unique=False)
     op.create_index(op.f("ix_runners_silk"), "runners", ["silk"], unique=False)
@@ -228,12 +242,14 @@ def downgrade():
     op.drop_index(op.f("ix_runners_silk"), table_name="runners")
     op.drop_index(op.f("ix_runners_shoes"), table_name="runners")
     op.drop_index(op.f("ix_runners_sex"), table_name="runners")
+    op.drop_index(op.f("ix_runners_rope_n"), table_name="runners")
     op.drop_index(op.f("ix_runners_race_id"), table_name="runners")
     op.drop_index(op.f("ix_runners_position"), table_name="runners")
     op.drop_index(op.f("ix_runners_owner_id"), table_name="runners")
     op.drop_index(op.f("ix_runners_music"), table_name="runners")
     op.drop_index(op.f("ix_runners_morning_odds"), table_name="runners")
     op.drop_index(op.f("ix_runners_length"), table_name="runners")
+    op.drop_index(op.f("ix_runners_kilometer_record_sec"), table_name="runners")
     op.drop_index(op.f("ix_runners_jockey_id"), table_name="runners")
     op.drop_index(op.f("ix_runners_horse_id"), table_name="runners")
     op.drop_index(op.f("ix_runners_final_odds"), table_name="runners")
@@ -268,6 +284,7 @@ def downgrade():
     op.drop_index(op.f("ix_horses_is_born_male"), table_name="horses")
     op.drop_index(op.f("ix_horses_father_id"), table_name="horses")
     op.drop_index(op.f("ix_horses_country_code"), table_name="horses")
+    op.drop_index(op.f("ix_horses_birth_year"), table_name="horses")
     op.drop_index("horse_name_parents_index", table_name="horses")
     op.drop_table("horses")
     # ### end Alembic commands ###

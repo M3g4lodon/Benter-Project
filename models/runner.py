@@ -1,4 +1,5 @@
 from typing import Optional
+from typing import Union
 
 import sqlalchemy as sa
 
@@ -25,6 +26,7 @@ class Runner(Base):
     )
     weight = sa.Column(sa.Float, nullable=True, index=True)
     unibet_n = sa.Column(sa.Integer, nullable=False, index=True)
+    rope_n = sa.Column(sa.Integer, nullable=True, index=True)
     draw = sa.Column(sa.Integer, nullable=True, index=True)
     blinkers = sa.Column(sa.String, nullable=True, index=True)
     shoes = sa.Column(sa.String, nullable=True, index=True)
@@ -33,10 +35,11 @@ class Runner(Base):
     music = sa.Column(sa.String, nullable=True, index=True)
     sex = sa.Column(sa.Enum(UnibetHorseSex), nullable=True, index=True)
     age = sa.Column(sa.Integer, nullable=True, index=True)
-    coat = sa.Column(sa.String, nullable=True, index=True)
+    coat = sa.Column(sa.String, nullable=True, index=True)  # in French "robe"
     origins = sa.Column(sa.String, nullable=True, index=False)
     comment = sa.Column(sa.String, nullable=True, index=False)
     length = sa.Column(sa.String, nullable=True, index=True)
+    kilometer_record_sec = sa.Column(sa.Float, nullable=True, index=True)
 
     owner_id = sa.Column(
         sa.Integer,
@@ -83,7 +86,7 @@ class Runner(Base):
         unibet_n: int,
         draw: int,
         blinkers: str,
-        shoes: str,
+        shoes: Optional[Union[str, int]],
         silk: str,
         stakes: int,
         music: str,
@@ -93,6 +96,8 @@ class Runner(Base):
         origins: str,
         comment: Optional[str],
         length: str,
+        rope_n: Optional[int],
+        kilometer_record_sec: Optional[int],
         owner: Optional[Owner],
         trainer: Optional[Trainer],
         jockey: Optional[Jockey],
@@ -105,7 +110,7 @@ class Runner(Base):
     ) -> "Runner":
         assert race
 
-        found_runner = (
+        found_runner: Optional[Runner] = (
             db_session.query(Runner).filter(Runner.unibet_id == unibet_id).one_or_none()
         )
         age_: Optional[int] = None
@@ -120,20 +125,8 @@ class Runner(Base):
         if sex == "":
             sex = None
 
-        if comment == "":
-            comment = None
-
-        if found_runner is not None and found_runner.age != age_:
-            found_runner.age = age_
-            db_session.commit()
-
-        if found_runner is not None and found_runner.sex != UnibetHorseSex(sex):
-            found_runner.sex = UnibetHorseSex(sex)
-            db_session.commit()
-
-        if found_runner is not None and found_runner.comment != comment:
-            found_runner.comment = comment
-            db_session.commit()
+        if shoes:
+            shoes = int(shoes)
 
         if found_runner is not None:
             assert found_runner.race_id == race.id
@@ -154,11 +147,17 @@ class Runner(Base):
             assert found_runner.owner_id == (owner.id if owner else None)
             assert found_runner.trainer_id == (trainer.id if trainer else None)
             assert found_runner.jockey_id == (jockey.id if jockey else None)
-            assert found_runner.horse_id == (horse.id if horse else None)
+            assert found_runner.horse_id == (
+                horse.id if horse else None
+            ), f"{found_runner.horse_id} != {horse.id if horse else None}"
             assert found_runner.position == (str(position) if position else None)
-            assert found_runner.race_duration_sec == race_duration_sec
+            assert (
+                found_runner.race_duration_sec == race_duration_sec
+            ), f"{found_runner.race_duration_sec} != {race_duration_sec}"
             assert found_runner.morning_odds == morning_odds
             assert found_runner.final_odds == final_odds
+            assert found_runner.rope_n == rope_n
+            assert found_runner.kilometer_record_sec == kilometer_record_sec
             assert found_runner.id
             return found_runner
 
@@ -179,6 +178,8 @@ class Runner(Base):
             origins=origins,
             comment=comment,
             length=length,
+            rope_n=rope_n,
+            kilometer_record_sec=kilometer_record_sec,
             owner_id=owner.id if owner else None,
             trainer_id=trainer.id if trainer else None,
             jockey_id=jockey.id if jockey else None,

@@ -2,6 +2,7 @@ import collections
 import datetime as dt
 import os
 from enum import Enum
+from typing import Optional
 
 TIMEZONE = "Europe/Paris"
 
@@ -117,6 +118,15 @@ class UnibetHorseSex(Enum):
     FEMALE = "F"
     GELDING = "H"  # "hongre" in French
     UNKNOWN = None
+
+    @property
+    def is_born_male(self) -> Optional[bool]:
+        if self == self.UNKNOWN:
+            return None
+        if self in [self.MALE, self.GELDING]:
+            return True
+        assert self == self.FEMALE
+        return False
 
 
 class UnibetBetTRateType:

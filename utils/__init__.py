@@ -52,9 +52,9 @@ def convert_duration_in_sec(time_str: Optional[str]) -> Optional[float]:
     if not time_str:
         return None
 
-    matches = re.match(r"(\d{1,2})'(\d{2})''(\d{2})", time_str)
+    matches = re.match(r"(\d{1,2})\s?'\s?(\d{1,2})\s?''\s?(\d{1,2})\s?", time_str)
     matches = (
-        re.match(r"""(\d{1,2})'(\d{2})"(\d{2})""", time_str)
+        re.match(r"""(\d{1,2})\s?'\s?(\d{1,2})\s?"\s?(\d{1,2})\s?""", time_str)
         if matches is None
         else matches
     )
@@ -63,4 +63,7 @@ def convert_duration_in_sec(time_str: Optional[str]) -> Optional[float]:
         return None
 
     n_min, n_sec, n_cs = matches.groups()
-    return 60 * int(n_min) + int(n_sec) + 0.01 * int(n_cs)
+
+    return (
+        60 * int(n_min) + int(n_sec) + 0.01 * int(n_cs) * (10 if len(n_cs) == 1 else 1)
+    )

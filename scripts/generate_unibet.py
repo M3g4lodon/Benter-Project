@@ -1,34 +1,36 @@
 import datetime as dt
 import json
-import logging
 import os
 import re
-from typing import List
+from typing import Set, Dict
 from typing import Optional
 from typing import Tuple
 
-from tqdm import tqdm
+import tqdm
+import Levenshtein as lev
 
-from constants import UNIBET_MIN_DATE
+from constants import UNIBET_MIN_DATE, UnibetCoat, DATA_DIR
+from constants import UnibetBlinkers
 from constants import UnibetHorseSex
+from constants import UnibetHorseShowGround
 from constants import UnibetProbableType
+from constants import UnibetRaceType
+from constants import UnibetShoes
 from database.setup import create_sqlalchemy_session
 from database.setup import SQLAlchemySession
+from models import Person
 from models.horse import Horse
 from models.horse_show import HorseShow
-from models.jockey import Jockey
-from models.owner import Owner
 from models.race import Race
 from models.race_track import RaceTrack
 from models.runner import Runner
-from models.trainer import Trainer
-from utils import convert_duration_in_sec
+from utils import convert_duration_in_sec, unibet_coat_parser
 from utils import date_countdown_generator
 from utils.logger import setup_logger
 
 UNIBET_DATA_PATH = "./data/Unibet"
 
-logger = setup_logger(__name__)
+logger = setup_logger(name=__file__)
 
 
 def _get_position(current_race_dict: dict, unibet_n: int) -> Optional[int]:
@@ -62,7 +64,7 @@ def _process_race(
         race_name=current_race_dict["name"],
         race_start_at=race_start_at,
         race_date=race_date,
-        race_type=current_race_dict["type"],
+        race_type=UnibetRaceType(current_race_dict["type"]),
         race_conditions=current_race_dict["conditions"],
         race_stake=current_race_dict["stake"],
         race_arjel_level=current_race_dict["arjelLevel"],
@@ -90,7 +92,7 @@ def _process_horse_show(
         horse_show_unibet_id=horse_show_dict["zeturfId"],
         horse_show_unibet_n=horse_show_dict["rank"],
         horse_show_datetime=dt.datetime.fromtimestamp(horse_show_dict["date"] / 1000),
-        horse_show_ground=horse_show_dict["ground"],
+        horse_show_ground=UnibetHorseShowGround(horse_show_dict["ground"]),
         race_track=race_track,
         db_session=db_session,
     )
@@ -99,23 +101,30 @@ def _process_horse_show(
 
 
 def _get_or_create_parent(
-    name: str, is_born_male: bool, db_session: SQLAlchemySession
+    parent_id: Optional[int],
+    name_country: str,
+    is_born_male: bool,
+    db_session: SQLAlchemySession,
 ) -> Optional[Horse]:
+    if parent_id is not None:
+        found_parent = db_session.query(Horse).filter(Horse.id == parent_id).one()
+        return found_parent
 
-    if not name:
+    if not name_country:
         logger.warning(
             "Could not find %s name with name: %s",
             ("father" if is_born_male else "mother"),
-            name,
+            name_country,
         )
         return None
+    name, country_code = _extract_name_country(name_country=name_country)
     potential_parents = (
         db_session.query(Horse)
         .filter(Horse.name == name, Horse.is_born_male.is_(is_born_male))
         .all()
     )
     if not potential_parents:
-        parent = Horse(name=name, is_born_male=is_born_male)
+        parent = Horse(name=name, is_born_male=is_born_male, country_code=country_code)
         db_session.add(parent)
         db_session.commit()
         return parent
@@ -124,94 +133,370 @@ def _get_or_create_parent(
 
     assert len(potential_parents) > 1
     logger.warning(
-        "Too many %s found for name: %s!",
+        "Too many %s (%s) found for name: %s (%s)",
         ("fathers" if is_born_male else "mothers"),
+        len(potential_parents),
         name,
+        country_code,
     )
     return None
 
 
+def _get_or_create_parents(
+    horse_id: Optional[int], parent_names: str, db_session: SQLAlchemySession
+) -> Tuple[Optional[Horse], Optional[Horse]]:
+    father_id, mother_id = None, None
+    if horse_id is not None:
+        found_horse = db_session.query(Horse).filter(Horse.id == horse_id).one()
+        father_id, mother_id = found_horse.father_id, found_horse.mother_id
+        if found_horse.father_id and found_horse.mother_id:
+            return found_horse.father, found_horse.mother
+
+    father_name, mother_name = _split_parent_names(parent_names=parent_names)
+
+    father = _get_or_create_parent(
+        parent_id=father_id,
+        name_country=father_name,
+        is_born_male=True,
+        db_session=db_session,
+    )
+    mother = _get_or_create_parent(
+        parent_id=mother_id,
+        name_country=mother_name,
+        is_born_male=False,
+        db_session=db_session,
+    )
+    return father, mother
+
+
+def _create_horse(
+    name: str,
+    country_code: Optional[str],
+    father: Optional[Horse],
+    mother: Optional[Horse],
+    parent_names: Optional[str],
+    birth_year: Optional[int],
+    is_born_male: Optional[bool],
+    db_session: SQLAlchemySession,
+) -> Horse:
+    horse = Horse(
+        name=name,
+        country_code=country_code,
+        father_id=father.id if father else None,
+        mother_id=mother.id if mother else None,
+        first_found_origins=parent_names,
+        birth_year=birth_year,
+        is_born_male=is_born_male,
+    )
+    db_session.add(horse)
+    db_session.commit()
+    assert horse.id
+    return horse
+
+
+def _check_update_or_create_horse(
+    found_horse: Horse,
+    name: str,
+    is_born_male: Optional[bool],
+    country_code: Optional[str],
+    father: Optional[Horse],
+    mother: Optional[Horse],
+    parent_names: Optional[str],
+    origins: Optional[str],
+    birth_year: Optional[int],
+    db_session: SQLAlchemySession,
+) -> Horse:
+    """Compare found_horses with found properties,
+    if it differs, we create a new horse,
+    otherwise we update missing properties with those we have."""
+
+    assert found_horse.name
+    assert found_horse.name == name
+
+    if country_code and found_horse.country_code:
+        if country_code != found_horse.country_code:
+            return _create_horse(
+                name=name,
+                country_code=country_code,
+                father=father,
+                mother=mother,
+                parent_names=parent_names,
+                birth_year=birth_year,
+                is_born_male=is_born_male,
+                db_session=db_session,
+            )
+
+    if is_born_male and found_horse.is_born_male:
+        if is_born_male != found_horse.is_born_male:
+            return _create_horse(
+                name=name,
+                country_code=country_code,
+                father=father,
+                mother=mother,
+                parent_names=parent_names,
+                birth_year=birth_year,
+                is_born_male=is_born_male,
+                db_session=db_session,
+            )
+    if country_code and found_horse.country_code:
+        if country_code != found_horse.country_code:
+            return _create_horse(
+                name=name,
+                country_code=country_code,
+                father=father,
+                mother=mother,
+                parent_names=parent_names,
+                birth_year=birth_year,
+                is_born_male=is_born_male,
+                db_session=db_session,
+            )
+    if is_born_male is not None and found_horse.is_born_male is not None:
+        if is_born_male != found_horse.is_born_male:
+            return _create_horse(
+                name=name,
+                country_code=country_code,
+                father=father,
+                mother=mother,
+                parent_names=parent_names,
+                birth_year=birth_year,
+                is_born_male=is_born_male,
+                db_session=db_session,
+            )
+
+    if parent_names and found_horse.first_found_origins:
+        if parent_names != found_horse.first_found_origins:
+            return _create_horse(
+                name=name,
+                country_code=country_code,
+                father=father,
+                mother=mother,
+                parent_names=parent_names,
+                birth_year=birth_year,
+                is_born_male=is_born_male,
+                db_session=db_session,
+            )
+
+    if birth_year and found_horse.birth_year:
+        if birth_year != found_horse.birth_year:
+            return _create_horse(
+                name=name,
+                country_code=country_code,
+                father=father,
+                mother=mother,
+                parent_names=parent_names,
+                birth_year=birth_year,
+                is_born_male=is_born_male,
+                db_session=db_session,
+            )
+
+    if father and found_horse.father_id:
+        if father.id != found_horse.father_id:
+            return _create_horse(
+                name=name,
+                country_code=country_code,
+                father=father,
+                mother=mother,
+                parent_names=parent_names,
+                birth_year=birth_year,
+                is_born_male=is_born_male,
+                db_session=db_session,
+            )
+
+    if mother and found_horse.mother_id:
+        if mother.id != found_horse.mother_id:
+            return _create_horse(
+                name=name,
+                country_code=country_code,
+                father=father,
+                mother=mother,
+                parent_names=parent_names,
+                birth_year=birth_year,
+                is_born_male=is_born_male,
+                db_session=db_session,
+            )
+
+    # Update the horse
+    if found_horse.country_code is None and country_code:
+        found_horse.country_code = country_code
+    if found_horse.father_id is None and father:
+        found_horse.father_id = father.id
+    if found_horse.mother_id is None and mother:
+        found_horse.mother_id = mother.id
+    if found_horse.is_born_male is None and is_born_male is not None:
+        found_horse.is_born_male = is_born_male
+    if found_horse.first_found_origins is None and origins:
+        found_horse.first_found_origins = origins
+    if found_horse.birth_year is None and birth_year:
+        found_horse.birth_year = birth_year
+    db_session.commit()
+    return found_horse
+
+
+def _count_not_none_horse_properties(horse: Horse) -> int:
+    res = 0
+    res += horse.name is not None
+    res += horse.country_code is not None
+    res += horse.is_born_male is not None
+    res += horse.first_found_origins is not None
+    res += horse.birth_year is not None
+    res += horse.father_id is not None
+    res += horse.mother_id is not None
+    return res
+
+
+def _extract_name_country(
+    name_country: Optional[str],
+) -> Tuple[Optional[str], Optional[str]]:
+    """
+
+    >>> _extract_name_country(None)
+    (None, None)
+
+    >>> _extract_name_country("Blublu ")
+    ('BLUBLU', None)
+
+    >>> _extract_name_country("Blublu (FR)")
+    ('BLUBLU', 'FR')
+
+    >>> _extract_name_country("Blublu {USA}")
+    ('BLUBLU', 'USA')
+
+    >>> _extract_name_country("Blublu {}")
+    ('BLUBLU', None)
+    """
+
+    if not name_country:
+        return None, None
+    name = re.sub(r"\s[\(\{].*[\)\}]", "", name_country)
+    name = name.upper()
+    name = name.strip()
+
+    country = None
+    country_match = re.match(r".*[\(\{](.*)[\)\}]", name_country)
+    if country_match:
+        country = country_match.group(1)
+        country = country.upper()
+        country = country.strip()
+
+    return name if name else None, country if country else None
+
+
 def _process_horse(
-    name: Optional[str],
-    name_country: str,
+    horse_id: Optional[int],
+    name_country_from_info: Optional[str],
+    name_country_from_runner: str,
     is_born_male: Optional[bool],
     parent_names: str,
     birth_year: Optional[int],
     db_session: SQLAlchemySession,
-) -> Optional[Horse]:
+) -> Horse:
 
-    if not name:
-        name = re.sub(r"\s\(.*\)", "", name_country)
-    name = name.upper()
-    name = name.strip()
+    name_from_info, country_from_info = _extract_name_country(
+        name_country=name_country_from_info
+    )
+    name_from_runner, country_from_runner = _extract_name_country(
+        name_country=name_country_from_runner
+    )
+    name = name_from_info if name_from_info else name_from_runner
     assert name
-
-    country_code = re.sub(r"\)", "", re.sub(r".*\(", "", name_country))
+    country_code = country_from_info if country_from_info else country_from_runner
     assert country_code
 
-    current_horses = db_session.query(Horse).filter(Horse.name == name).all()
-    # TODO create parents if necessary
-    if birth_year:
-        current_horses_with_same_birth_year = [
-            horse for horse in current_horses if horse.birth_year == birth_year
-        ]
-        if len(current_horses_with_same_birth_year) == 1:
-            horse = current_horses_with_same_birth_year[0]
-            assert horse.father_id
-            assert horse.mother_id
-            return horse
+    father, mother = _get_or_create_parents(
+        horse_id=horse_id, parent_names=parent_names, db_session=db_session
+    )
+    if horse_id is not None:
+        found_horse = db_session.query(Horse).filter(Horse.id == horse_id).one()
+        return found_horse
 
+    current_horses = db_session.query(Horse).filter(Horse.name == name).all()
+
+    if is_born_male is not None:
+        current_horses = [
+            horse
+            for horse in current_horses
+            if horse.is_born_male is is_born_male or horse.is_born_male is None
+        ]
+
+    if country_code:
+        current_horses = [
+            horse
+            for horse in current_horses
+            if horse.country_code == country_code or horse.country_code is None
+        ]
+
+    if father:
+        current_horses = [
+            horse
+            for horse in current_horses
+            if horse.father_id == father.id or horse.father_id is None
+        ]
+
+    if mother:
+        current_horses = [
+            horse
+            for horse in current_horses
+            if horse.mother_id == mother.id or horse.mother_id is None
+        ]
     if parent_names:
-        current_horses_with_origins = [
+        current_horses = [
             horse
             for horse in current_horses
             if horse.first_found_origins == parent_names
+            or horse.first_found_origins is None
         ]
-
-        if len(current_horses_with_origins) == 1:
-            horse = current_horses_with_origins[0]
-            assert horse.father_id
-            assert horse.mother_id
-            return horse
-
-    father_mother_names: List[str] = []
-    if parent_names:
-        father_mother_names = re.split("[-/]", parent_names)
-        if len(father_mother_names) != 2:
-            father_mother_names = re.split("\set\s", parent_names)
-        if len(father_mother_names) != 2:
-            father_mother_names = parent_names.strip().split()
-
-    if len(father_mother_names) != 2:
-        logger.warning(
-            "Could not find father mother names in origins: %s", parent_names
+    if not current_horses:
+        return _create_horse(
+            name=name,
+            country_code=country_code,
+            father=father,
+            mother=mother,
+            parent_names=parent_names,
+            birth_year=birth_year,
+            is_born_male=is_born_male,
+            db_session=db_session,
         )
 
-    father, mother = None, None
-    if len(father_mother_names) == 2:
-        father_name, mother_name = father_mother_names
-        father_name = father_name.upper().strip()
-        mother_name = mother_name.upper().strip()
-
-        father = _get_or_create_parent(
-            name=father_name, is_born_male=True, db_session=db_session
+    if len(current_horses) > 1:
+        max_not_none_properties = max(
+            [_count_not_none_horse_properties(horse) for horse in current_horses]
         )
-        mother = _get_or_create_parent(
-            name=mother_name, is_born_male=False, db_session=db_session
+        selected_horses = [
+            horse
+            for horse in current_horses
+            if _count_not_none_horse_properties(horse) == max_not_none_properties
+        ]
+        min_id = min([horse.id for horse in selected_horses])
+        selected_horses = [horse for horse in selected_horses if horse.id == min_id]
+        assert len(selected_horses) == 1
+        found_horse = selected_horses[0]
+        return _check_update_or_create_horse(
+            found_horse=found_horse,
+            name=name,
+            is_born_male=is_born_male,
+            country_code=country_code,
+            father=father,
+            mother=mother,
+            parent_names=parent_names,
+            origins=parent_names,
+            birth_year=birth_year,
+            db_session=db_session,
         )
 
-    horse = Horse.upsert(
+    assert len(current_horses) == 1
+    found_horse = current_horses[0]
+    return _check_update_or_create_horse(
+        found_horse=found_horse,
         name=name,
         is_born_male=is_born_male,
         country_code=country_code,
         father=father,
         mother=mother,
+        parent_names=parent_names,
         origins=parent_names,
         birth_year=birth_year,
         db_session=db_session,
     )
-
-    return horse
 
 
 def _process_runner(
@@ -221,23 +506,51 @@ def _process_runner(
     current_race_dict: dict,
     db_session: SQLAlchemySession,
 ) -> None:
+    unibet_id = runner_dict["zeturfId"]
+    found_runner: Optional[Runner] = (
+        db_session.query(Runner).filter(Runner.unibet_id == unibet_id).one_or_none()
+    )
+
     runner_stats_info: Optional[dict] = runner_stats.get("fiche", {}).get(
-        "info_generales"
+        "infos_generales"
     )
     # We don't use last performances info in runner_stats
+    # Can we trust this runner_stats
+
+    if runner_stats_info:
+        name_from_runner_dict, _ = _extract_name_country(
+            name_country=runner_dict["name"]
+        )
+
+        name_from_info, _ = _extract_name_country(name_country=runner_stats_info["nom"])
+
+        if name_from_info and lev.distance(name_from_runner_dict, name_from_info) > 2:
+            logger.warning(
+                "Ignoring runner_stats_info with name %s different "
+                "from %s in runner_dict",
+                name_from_info,
+                name_from_runner_dict,
+            )
+            runner_stats_info = None
 
     if race.type is None and runner_stats_info:
         race.type = runner_stats_info["discipline"]
         db_session.commit()
 
     owner_name = runner_stats_info["proprietaire"] if runner_stats_info else None
+    owner_name = None if not isinstance(owner_name, str) else owner_name
     owner_name = (
         runner_dict["details"]["owner"]
         if runner_dict["details"] and owner_name is None
         else owner_name
     )
+    owner_name = None if not isinstance(owner_name, str) else owner_name
 
-    owner = Owner.upsert(name=owner_name, db_session=db_session)
+    owner = Person.upsert(
+        person_id=(found_runner.owner_id if found_runner else None),
+        name=owner_name,
+        db_session=db_session,
+    )
     trainer_name = runner_stats_info["entraineur"] if runner_stats_info else None
     trainer_name = (
         runner_dict["details"]["trainer"]
@@ -245,15 +558,20 @@ def _process_runner(
         else trainer_name
     )
 
-    trainer = Trainer.upsert(name=trainer_name, db_session=db_session)
+    trainer = Person.upsert(
+        person_id=(found_runner.trainer_id if found_runner else None),
+        name=trainer_name,
+        db_session=db_session,
+    )
 
     jockey_name = (
         runner_stats_info["jockey"] if runner_stats_info else runner_dict["jockey"]
     )
-    jockey = Jockey.upsert(name=jockey_name, db_session=db_session)
-
-    horse_name = runner_stats_info["nom"] if runner_stats_info else None
-    horse_name = runner_dict["name"] if not horse_name else None
+    jockey = Person.upsert(
+        person_id=(found_runner.jockey_id if found_runner else None),
+        name=jockey_name,
+        db_session=db_session,
+    )
 
     horse_sex = runner_stats_info.get("sex") if runner_stats_info else None
     horse_sex = (
@@ -261,68 +579,58 @@ def _process_runner(
         if horse_sex
         else (runner_dict["details"].get("sex") if runner_dict.get("details") else None)
     )
-    horse_sex = UnibetHorseSex(horse_sex)
+    horse_sex = UnibetHorseSex(horse_sex or None)
     is_born_male = horse_sex.is_born_male
 
-    parent_names = runner_stats_info.get("parents") if runner_stats_info else None
-    parent_names = (
-        parent_names
-        if parent_names
-        else (
-            runner_dict["details"].get("origins")
-            if runner_dict.get("details")
-            else None
-        )
+    parent_names = _get_parent_names(
+        runner_dict=runner_dict, runner_stats_info=runner_stats_info
     )
-    if parent_names:
-        parent_names = parent_names.strip()
     birth_year = runner_stats_info.get("age") if runner_stats_info else None
     horse = _process_horse(
-        name=horse_name,
-        name_country=runner_dict["name"],
+        horse_id=(found_runner.horse_id if found_runner else None),
+        name_country_from_info=runner_stats_info["nom"] if runner_stats_info else None,
+        name_country_from_runner=runner_dict["name"],
         is_born_male=is_born_male,
         parent_names=parent_names,
         birth_year=birth_year,
         db_session=db_session,
     )
 
-    coat = runner_stats_info.get("robe") if runner_stats_info else None
-    coat = (
-        runner_dict["details"].get("coat")
-        if runner_dict.get("details") and coat is None
-        else coat
+    coat_str = (
+        runner_dict["details"].get("coat") if runner_dict.get("details") else None
     )
+    coat = unibet_coat_parser.get_coat(coat=coat_str)
+    if (
+        coat == UnibetCoat.UNKNOWN
+        and runner_stats_info
+        and runner_stats_info.get("robe")
+    ):
+        coat = unibet_coat_parser.get_coat(runner_stats_info.get("robe"))
 
-    blinkers = runner_stats_info.get("oeillere") if runner_stats_info else None
-    blinkers = runner_dict["blinkers"] if blinkers is None else blinkers
+    # blinkers in runner_dict are more precise than in runner_stats_info
+    blinkers = UnibetBlinkers(runner_dict["blinkers"])
 
-    stakes = runner_stats_info.get("gain") if runner_stats_info else None
+    # historical_stakes_at_query_time: Optional[int] = runner_stats_info.get(
+    #     "gain"
+    # ) if runner_stats_info else None
     stakes = (
-        runner_dict["details"].get("stakes")
-        if runner_dict.get("details") and stakes is None
-        else stakes
+        runner_dict["details"].get("stakes") if runner_dict.get("details") else None
     )
 
-    music = runner_stats_info.get("musique") if runner_stats_info else None
+    music: Optional[str] = (
+        runner_stats_info.get("musique") if runner_stats_info else None
+    )
     music = (
         runner_dict["details"].get("musique")
         if runner_dict.get("details") and music is None
         else music
     )
 
-    kilometer_record_sec = (
-        convert_duration_in_sec(runner_stats_info.get("record"))
-        if runner_stats_info
-        else None
-    )
+    record = runner_stats_info.get("record") if runner_stats_info else None
+    record = record if isinstance(record, str) else None
+    kilometer_record_sec = convert_duration_in_sec(record)
 
-    shoes = runner_stats_info.get("ferrure") if runner_stats_info else None
-    shoes = (
-        runner_dict["details"].get("shoes")
-        if runner_dict.get("details") and shoes is None
-        else shoes
-    )
-
+    shoes = UnibetShoes(runner_dict["shoes"])
     morning_odds, final_odds = None, None
 
     if current_race_dict.get("details") and current_race_dict["details"].get(
@@ -335,15 +643,38 @@ def _process_runner(
             str(UnibetProbableType.FINAL_SIMPLE_GAGNANT_ODDS)
         ].get(str(runner_dict["rank"]))
 
+    weight = runner_dict["weight"]
+    assert isinstance(weight, int)
+    if weight > 200:
+        logger.warning(
+            "Removing weight %s >200 on race %s, runner unibet_id %s",
+            weight,
+            race.id,
+            unibet_id,
+        )
+        weight = None
+
+    age_str = runner_dict["details"].get("age") if runner_dict.get("details") else None
+    age: Optional[int] = None
+    if age_str == "":
+        age = None
+    elif age_str is not None and int(age_str) > 100:
+        logger.warning(
+            "Incorrect age '%s' for runner's Unibet_id %s", age_str, unibet_id
+        )
+        age = None
+    elif age_str is not None:
+        age = int(age_str)
+
     _ = Runner.upsert(
-        unibet_id=runner_dict["zeturfId"],
+        unibet_id=unibet_id,
         race=race,
         race_duration_sec=convert_duration_in_sec(
             time_str=runner_dict["details"].get("time")
         )
         if runner_dict.get("details")
         else None,
-        weight=runner_dict["weight"],
+        weight=weight,
         unibet_n=runner_dict["rank"],
         rope_n=runner_stats_info.get("corde") if runner_stats_info else None,
         draw=runner_dict["draw"],
@@ -352,8 +683,9 @@ def _process_runner(
         silk=runner_dict["silk"],
         stakes=stakes,
         music=music,
-        sex=horse_sex,
-        age=runner_dict["details"].get("age") if runner_dict.get("details") else None,
+        sex=UnibetHorseSex(horse_sex or None),
+        age=age,
+        team=runner_dict["team"],
         coat=coat,
         origins=parent_names,
         comment=runner_dict["details"].get("comment")
@@ -374,9 +706,244 @@ def _process_runner(
     )
 
 
+def _get_male_female_names(
+    runner_dict: dict, runner_stats_info: dict
+) -> Tuple[Optional[str], Optional[str]]:
+    name_country_from_info = runner_stats_info["nom"] if runner_stats_info else None
+    name_country_from_runner = runner_dict["name"]
+
+    name_from_info, _ = _extract_name_country(name_country=name_country_from_info)
+    name_from_runner, _ = _extract_name_country(name_country=name_country_from_runner)
+    name = name_from_info if name_from_info else name_from_runner
+    assert name
+
+    horse_sex = runner_stats_info.get("sex") if runner_stats_info else None
+    horse_sex = (
+        horse_sex
+        if horse_sex
+        else (runner_dict["details"].get("sex") if runner_dict.get("details") else None)
+    )
+    horse_sex = UnibetHorseSex(horse_sex or None)
+
+    if horse_sex == UnibetHorseSex.UNKNOWN:
+        return None, None
+
+    if horse_sex.is_born_male:
+        return name, None
+
+    return None, name
+
+
+def _get_parent_names(
+    runner_dict: dict, runner_stats_info: Optional[dict]
+) -> Optional[str]:
+    parent_names = runner_stats_info.get("parents") if runner_stats_info else None
+    parent_names = (
+        parent_names
+        if parent_names
+        else (
+            runner_dict["details"].get("origins")
+            if runner_dict.get("details")
+            else None
+        )
+    )
+    if parent_names:
+        parent_names = parent_names.strip()
+
+    return parent_names
+
+
+def _split_parent_names(parent_names: str) -> Tuple[Optional[str], Optional[str]]:
+    if not parent_names:
+        return None, None
+    father_mother_names = re.split(r"[-/]", parent_names)
+    if len(father_mother_names) != 2:
+        father_mother_names = re.split(r"\s[-/]\s", parent_names)
+    if len(father_mother_names) != 2:
+        father_mother_names = re.split(r"\set\s", parent_names)
+    if len(father_mother_names) != 2:
+        father_mother_names = parent_names.strip().split()
+
+    if len(father_mother_names) != 2:
+        logger.warning(
+            "Could not find father mother names in origins: %s", parent_names
+        )
+        return None, None
+
+    father_name, mother_name = father_mother_names
+    father_name = father_name.upper().strip()
+    mother_name = mother_name.upper().strip()
+    return father_name, mother_name
+
+
+def _resolve_parent_names_from_already_names(
+    male_names: Set[str], female_names: Set[str], not_understood_parent_names: Set[str]
+) -> Dict[str, Tuple[str, str]]:
+
+    parent_name_mapping: Dict[str, Tuple[str, str]] = {}
+    for parent_name in tqdm.tqdm(
+        not_understood_parent_names, total=len(not_understood_parent_names)
+    ):
+        if not parent_name:
+            continue
+        matching_mother_names = []
+        matching_father_names = []
+        for male_name in male_names:
+            if "(" in male_name or ")" in male_name:
+                continue
+
+            if re.search(fr"^{male_name.upper()}\b", parent_name.upper()):
+                matching_father_names.append(male_name)
+
+        for female_name in female_names:
+            if "(" in female_name or ")" in female_name:
+                continue
+
+            if re.search(fr"\b{female_name.upper()}$", parent_name.upper()):
+                matching_mother_names.append(female_name)
+
+        matched_mother_name = None
+        if matching_mother_names:
+            matched_mother_name = max(matching_mother_names, key=len)
+        matched_father_name = None
+        if matching_father_names:
+            matched_father_name = max(matching_father_names, key=len)
+
+        if (len(matched_mother_name or "") + len(matching_father_names or "")) >= len(
+            parent_name
+        ):
+            logger.warning(f"Error with {parent_name}")
+            continue
+
+        if matched_mother_name and not matched_father_name:
+            new_father_name = re.sub(
+                fr"\b{matched_mother_name.upper()}$","", parent_name.upper()
+            )
+            new_father_name = new_father_name.strip()
+            if not new_father_name:
+                continue
+            parent_name_mapping[parent_name] = (new_father_name, matched_mother_name)
+
+        if matched_father_name and not matched_mother_name:
+            new_mother_name = re.sub(
+                fr"^{matched_father_name.upper()}\b", "", parent_name.upper()
+            )
+
+            new_mother_name = new_mother_name.strip()
+            if not new_mother_name:
+                continue
+            parent_name_mapping[parent_name] = (matched_father_name, new_mother_name)
+
+        if matched_father_name and matched_mother_name:
+            parent_name_mapping[parent_name] = (
+                matched_father_name,
+                matched_mother_name,
+            )
+
+    return parent_name_mapping
+
+
+def pre_run():
+    """
+    The goal of this function is to generate a json with hard to identify parent names.
+    """
+    male_names = set()
+    female_names = set()
+    not_understood_parent_names = set()
+    for date in tqdm.tqdm(
+        date_countdown_generator(
+            start_date=UNIBET_MIN_DATE,
+            end_date=dt.date.today() - dt.timedelta(days=1),
+        ),
+        total=(dt.date.today() - dt.timedelta(days=1) - UNIBET_MIN_DATE).days,
+        unit="days",
+    ):
+        if not date.isoformat() in os.listdir(UNIBET_DATA_PATH):
+            logger.info("Could not find folder for date: %s", date.isoformat())
+            continue
+        day_folder_path = os.path.join(UNIBET_DATA_PATH, date.isoformat())
+        if "programme.json" not in os.listdir(day_folder_path):
+            logger.info("Could not find programme.json for date: %s", date.isoformat())
+            continue
+
+        with open(os.path.join(day_folder_path, "programme.json"), "r") as fp:
+            programme = json.load(fp=fp)
+        if "data" not in programme:
+            logger.info("Can not import programme of %s", date.isoformat())
+            continue
+
+        horse_shows_dict = programme["data"]
+        for horse_show_dict in horse_shows_dict:
+
+            if horse_show_dict.get("races"):
+
+                for race_dict in horse_show_dict["races"]:
+                    race_path = os.path.join(
+                        day_folder_path,
+                        f"R{horse_show_dict['rank']}_C" f"{race_dict['rank']}.json",
+                    )
+                    with open(race_path, "r") as fp:
+                        complete_race_dict = json.load(fp=fp)
+
+                    current_race_dict = complete_race_dict
+                    if complete_race_dict.get("note") == "server error, no json":
+                        # Can not use complete_race
+                        current_race_dict = race_dict
+
+                    for runner_dict in current_race_dict["runners"]:
+
+                        runner_statistics_path = os.path.join(
+                            day_folder_path,
+                            f"R{horse_show_dict['rank']}_"
+                            f"C{race_dict['rank']}_"
+                            f"RN{runner_dict['rank']}.json",
+                        )
+                        with open(runner_statistics_path, "r") as fp:
+                            runner_stats = json.load(fp=fp)
+
+                        runner_stats_info: Optional[dict] = runner_stats.get(
+                            "fiche", {}
+                        ).get("infos_generales")
+
+                        male_name, female_name = _get_male_female_names(
+                            runner_dict=runner_dict, runner_stats_info=runner_stats_info
+                        )
+                        if male_name:
+                            male_names.add(male_name)
+                        if female_name:
+                            female_names.add(female_name)
+
+                        parent_name = _get_parent_names(
+                            runner_dict=runner_dict, runner_stats_info=runner_stats_info
+                        )
+                        father_name, mother_name = _split_parent_names(parent_name)
+                        father_name, _ = _extract_name_country(name_country=father_name)
+                        mother_name, _ = _extract_name_country(name_country=mother_name)
+                        if father_name is None and mother_name is None:
+                            not_understood_parent_names.add(parent_name)
+
+                        if father_name:
+                            male_names.add(father_name)
+                        if mother_name:
+                            female_names.add(mother_name)
+    logger.info(
+        f"{len(male_names)} male names, "
+        f"{len(female_names)} female names, "
+        f"{len(not_understood_parent_names)} not understood parent names"
+    )
+    parent_name_mapping = _resolve_parent_names_from_already_names(
+        male_names=male_names,
+        female_names=female_names,
+        not_understood_parent_names=not_understood_parent_names,
+    )
+
+    with open(os.path.join(DATA_DIR, "unibet_parent_name_mapping.json"), "w+") as fp:
+        json.dump(obj=parent_name_mapping, fp=fp)
+
+
 def run():  # pylint:disable=too-many-branches
     with create_sqlalchemy_session() as db_session:
-        for date in tqdm(
+        for date in tqdm.tqdm(
             date_countdown_generator(
                 start_date=UNIBET_MIN_DATE,
                 end_date=dt.date.today() - dt.timedelta(days=1),
@@ -428,7 +995,8 @@ def run():  # pylint:disable=too-many-branches
                         for runner_dict in current_race_dict["runners"]:
                             runner_statistics_path = os.path.join(
                                 day_folder_path,
-                                f"R{horse_show.unibet_n}_C{race_dict['rank']}_"
+                                f"R{horse_show.unibet_n}_"
+                                f"C{race.unibet_n}_"
                                 f"RN{runner_dict['rank']}.json",
                             )
                             with open(runner_statistics_path, "r") as fp:
@@ -443,4 +1011,4 @@ def run():  # pylint:disable=too-many-branches
 
 
 if __name__ == "__main__":
-    run()
+    pre_run()

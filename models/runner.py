@@ -1,15 +1,15 @@
-from typing import Optional
-from typing import Union
+from typing import Optional, Tuple
+import datetime as dt
 
 import sqlalchemy as sa
 
+from constants import UnibetBlinkers, UnibetCoat
 from constants import UnibetHorseSex
+from constants import UnibetShoes
 from database.setup import SQLAlchemySession
 from models import Horse
-from models import Jockey
-from models import Owner
+from models import Person
 from models import Race
-from models import Trainer
 from models.base import Base
 
 
@@ -26,16 +26,27 @@ class Runner(Base):
     )
     weight = sa.Column(sa.Float, nullable=True, index=True)
     unibet_n = sa.Column(sa.Integer, nullable=False, index=True)
-    rope_n = sa.Column(sa.Integer, nullable=True, index=True)
-    draw = sa.Column(sa.Integer, nullable=True, index=True)
-    blinkers = sa.Column(sa.String, nullable=True, index=True)
-    shoes = sa.Column(sa.String, nullable=True, index=True)
-    silk = sa.Column(sa.String, nullable=True, index=True)
-    stakes = sa.Column(sa.Integer, nullable=True, index=True)
+    rope_n = sa.Column(
+        sa.Integer, nullable=True, index=True
+    )  # in French "Corde", is the real draw number (double checked with PMU data)
+    draw = sa.Column(
+        sa.Integer, nullable=True, index=True
+    )  # Might be different from `rope_n`
+    blinkers = sa.Column(sa.Enum(UnibetBlinkers), nullable=True, index=True)
+    shoes = sa.Column(sa.Enum(UnibetShoes), nullable=True, index=True)
+    silk = sa.Column(
+        sa.String, nullable=True, index=True
+    )  # image name of the jockey jersey
+    stakes = sa.Column(
+        sa.Integer, nullable=True, index=True
+    )  # from runner dict, probably year to year stakes (not sure)
     music = sa.Column(sa.String, nullable=True, index=True)
     sex = sa.Column(sa.Enum(UnibetHorseSex), nullable=True, index=True)
     age = sa.Column(sa.Integer, nullable=True, index=True)
-    coat = sa.Column(sa.String, nullable=True, index=True)  # in French "robe"
+    team = sa.Column(
+        sa.Integer, nullable=False, index=True
+    )  # team number in race 0 means no team, 1 first team and so on...
+    coat = sa.Column(sa.Enum(UnibetCoat), nullable=True, index=True)  # in French "robe", equine color
     origins = sa.Column(sa.String, nullable=True, index=False)
     comment = sa.Column(sa.String, nullable=True, index=False)
     length = sa.Column(sa.String, nullable=True, index=True)
@@ -43,21 +54,21 @@ class Runner(Base):
 
     owner_id = sa.Column(
         sa.Integer,
-        sa.ForeignKey("owners.id", ondelete="CASCADE"),
+        sa.ForeignKey("persons.id", ondelete="CASCADE"),
         nullable=True,
         index=True,
     )
 
     trainer_id = sa.Column(
         sa.Integer,
-        sa.ForeignKey("trainers.id", ondelete="CASCADE"),
+        sa.ForeignKey("persons.id", ondelete="CASCADE"),
         nullable=True,
         index=True,
     )
 
     jockey_id = sa.Column(
         sa.Integer,
-        sa.ForeignKey("jockeys.id", ondelete="CASCADE"),
+        sa.ForeignKey("persons.id", ondelete="CASCADE"),
         nullable=True,
         index=True,
     )
@@ -74,33 +85,46 @@ class Runner(Base):
     final_odds = sa.Column(sa.Float, nullable=True, index=True)
 
     @property
-    def date(self):
+    def date(self)->dt.date:
         return self.race.date
+
+    @property
+    def horse_show_unibet_n(self)->int:
+        return self.race.horse_show.unibet_n
+
+    @property
+    def race_unibet_n(self)->int:
+        return self.race.unibet_n
+
+    @property
+    def unibet_code(self)->Tuple[dt.date, int, int, int]:
+        return self.date, self.horse_show_unibet_n, self.race_unibet_n, self.unibet_n
 
     @classmethod
     def upsert(
         cls,
         unibet_id: int,
         race: Race,
-        weight: int,
+        weight: Optional[int],
         unibet_n: int,
         draw: int,
-        blinkers: str,
-        shoes: Optional[Union[str, int]],
+        blinkers: UnibetBlinkers,
+        shoes: UnibetShoes,
         silk: str,
-        stakes: int,
-        music: str,
-        sex: Optional[str],
-        age: Optional[str],
-        coat: str,
+        stakes: Optional[int],
+        music: Optional[str],
+        sex: UnibetHorseSex,
+        age: Optional[int],
+        team: int,
+        coat: UnibetCoat,
         origins: str,
         comment: Optional[str],
         length: str,
         rope_n: Optional[int],
-        kilometer_record_sec: Optional[int],
-        owner: Optional[Owner],
-        trainer: Optional[Trainer],
-        jockey: Optional[Jockey],
+        kilometer_record_sec: Optional[float],
+        owner: Optional[Person],
+        trainer: Optional[Person],
+        jockey: Optional[Person],
         horse: Optional[Horse],
         position: Optional[int],
         race_duration_sec: Optional[float],
@@ -113,37 +137,27 @@ class Runner(Base):
         found_runner: Optional[Runner] = (
             db_session.query(Runner).filter(Runner.unibet_id == unibet_id).one_or_none()
         )
-        age_: Optional[int] = None
-        if age == "":
-            age_ = None
-        elif age is not None and int(age) > 100:
-            age_ = None
-        elif age is not None:
-            age_ = int(age)
-        del age
-
-        if sex == "":
-            sex = None
-
-        if shoes:
-            shoes = int(shoes)
 
         if found_runner is not None:
+
             assert found_runner.race_id == race.id
             assert found_runner.weight == weight
             assert found_runner.unibet_n == unibet_n
             assert found_runner.draw == draw
-            assert found_runner.blinkers == blinkers
-            assert found_runner.shoes == shoes
+            assert (
+                found_runner.blinkers == blinkers
+            ), f"{found_runner.blinkers} != {blinkers}"
+            assert found_runner.shoes == shoes, f"{found_runner.shoes} != {shoes}"
             assert found_runner.silk == silk
             assert found_runner.stakes == stakes
             assert found_runner.music == music
-            assert found_runner.sex == UnibetHorseSex(sex)
-            assert found_runner.age == age_
-            assert found_runner.coat == coat
+            assert found_runner.sex == sex
+            assert found_runner.age == age, f"{found_runner.age} != {age}"
+            assert found_runner.coat == coat, f"{found_runner.coat} != {coat}"
             assert found_runner.origins == origins
             assert found_runner.comment == comment
             assert found_runner.length == length
+            assert found_runner.team == team, f"{found_runner.team} != {team}"
             assert found_runner.owner_id == (owner.id if owner else None)
             assert found_runner.trainer_id == (trainer.id if trainer else None)
             assert found_runner.jockey_id == (jockey.id if jockey else None)
@@ -173,7 +187,8 @@ class Runner(Base):
             stakes=stakes,
             music=music,
             sex=UnibetHorseSex(sex),
-            age=age_,
+            age=age,
+            team=team,
             coat=coat,
             origins=origins,
             comment=comment,

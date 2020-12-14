@@ -30,6 +30,8 @@ setuptools.setup(
         "lightgbm",
         "tensorflow",
         "jupyterlab",
+        "python-Levenshtein",
+        "nltk",
         "seaborn",
         "tabulate",
         "tpot",
@@ -39,7 +41,23 @@ setuptools.setup(
         "jupyter_contrib_nbextensions",
         "jupyter_nbextensions_configurator",
     ],
-    extras_require={"test": ["pytest"]},
+    extras_require={
+        "test": [
+            "pytest",
+            "pip-tools",
+            "black",
+            "flake8",
+            "mypy",
+            "pylint",
+            "factory-boy",
+            "pytest-cov",
+            "pytest-sugar",
+            "pytest-cases",
+            "pytest-responses",
+            "vulture",
+            "pre-commit",
+        ]
+    },
     project_urls={"Source": "https://github.com/M3g4lodon/Benter-Project"},
     python_requires=">=3.6",
 )

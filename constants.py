@@ -129,7 +129,7 @@ class UnibetHorseSex(Enum):
         return False
 
 
-class UnibetBetTRateType:
+class UnibetBetRateType:
     """As of Nov 27th 2020, found in Unibet JS code"""
 
     # Mise de base: 1€<br>Trouvez le 1er cheval de l’arrivée.
@@ -204,3 +204,93 @@ class UnibetProbableType:
 
     # "rapport_final" on deuzio
     FINAL_DEUZIO_ODDS = 13
+
+
+class UnibetRaceType(Enum):
+    HURDLE = "Haies"
+    HARNESS = "Attelé"
+    STEEPLE_CHASE = "Steeple-Chase"
+    CROSS_COUNTRY = "Cross-Country"
+    MOUNTED = "Monté"
+    FLAT = "Plat"
+    UNKNOWN = None
+
+
+class UnibetHorseShowGround(Enum):
+    LIGHT = "Léger"
+    SLOW = "Lent"
+    UNKNOWN = "-"
+    HEAVY = "Lourd"
+    VERY_LOOSE = "Très souple"
+    DRY = "Sec"
+    GOOD = "Bon"
+    LOOSE = "Souple"
+    STICKY = "Collant"
+    FAST = "Rapide"
+    VERY_HEAVY = "Très lourd"
+    GOOD_LOOSE = "Bon-Souple"
+    VERY_FAST = "Très rapide"
+    GOOD_LIGHT = "Bon-Léger"
+    STANDART = "Standard"
+
+
+class UnibetBlinkers(Enum):
+    UNKNOWN = None
+    NO_BLINKERS = "0"  # or ""
+    BLINKERS = "1"  # or "X" for runner_info_stats
+    AUSTRALIEN_BLINKERS = "2"  # or "A" for runner_info_stats
+    FIRST_TIME_BLINKERS = "3"
+    FIRST_TIME_AUSTRALIAN_BLINKERS = "4"
+
+
+class UnibetShoes(Enum):
+    SHOD = ""
+    FIRST_TIME_FULLY_UNSHOD = "5"
+    FULLY_UNSHOD = "4"
+    FIRST_TIME_BACK_UNSHOD = "Q"
+    BACK_UNSHOD = "P"
+    FIST_TIME_FRONT_UNSHOD = "B"
+    FRONT_UNSHOD = "A"
+
+# https://www.lexiqueducheval.net/lexique_sommaire.html
+class UnibetCoat(Enum):
+    UNKNOWN = None
+    PALOMINO = "PALOMINO"
+    ROUAN = "ROUAN"
+    WHITE = "WHITE"
+    BLACK = "BLACK"
+    GREY = "GREY"
+    CHESTNUT = "CHESTNUT"
+    DUN = "DUN"
+    BAY = "BAY"
+    DARK_BAY = "DARK_BAY"
+    LIGHT_BAY = "LIGHT_BAY"
+    BROWN = "BROWN"
+    STRAWBERRY_ROUAN = "STRAWBERRY_ROUAN"
+    LIVER_CHESTNUT = "LIVER_CHESTNUT"
+    LIGHT_CHESTNUT = "LIGHT_CHESTNUT"
+    DARK_CHESTNUT = "DARK_CHESTNUT"
+    FLAXEN_CHESTNUT = "FLAXEN_CHESTNUT"
+    COPPER_CHESTNUT = "COPPER_CHESTNUT"
+    PIEBALD_CHESTNUT = "PIEBALD_CHESTNUT"
+    RUBICANO_CHESTNUT = "RUBICANO_CHESTNUT"
+    MEDLEY_CHESTNUT = "MEDLEY_CHESTNUT"
+    AUBERE = "AUBERE"
+    CHERRY_BAY = "CHERRY_BAY"
+    RUBICANO_BAY = "RUBICANO_BAY"
+    GREY_BAY = "GREY_BAY"
+    PIEBALD_BAY = "PIEBALD_BAY"
+    BLACK_BROWN = "BLACK_BROWN"
+    GREY_BROWN = "GREY_BROWN"
+    DARK_BROWN = "DARK_BROWN"
+    CHOCOLATE = "CHOCOLATE"
+    LIGHT_GREY = "LIGHT_GREY"
+    DARK_GREY = "DARK_GREY"
+    GREY_BLACK = "GREY_BLACK"
+    GREY_CHESTNUT = "GREY_CHESTNUT"
+    GREY_ROUAN = "ROUAN_CHESTNUT"
+    LOUVET = "LOUVET"
+    PANGARE_NOIR = "PANDARE_NOIR"
+    SABINO = "SABINO"
+    MEDLEY_BAY = "MEDLEY_BAY"
+    MEDLEY_SABINO = "MEDLEY_SABINO"

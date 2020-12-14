@@ -1,8 +1,10 @@
 import datetime as dt
+from typing import Tuple
 
 import sqlalchemy as sa
 from sqlalchemy.orm import relationship
 
+from constants import UnibetRaceType
 from database.setup import SQLAlchemySession
 from models import HorseShow
 from models.base import Base
@@ -17,10 +19,9 @@ class Race(Base):
     start_at = sa.Column(sa.DateTime, nullable=False)
     date = sa.Column(sa.Date, nullable=False, index=True)
     unibet_n = sa.Column(sa.Integer, nullable=False, index=True)
-    type = sa.Column(sa.String, nullable=True)
+    type = sa.Column(sa.Enum(UnibetRaceType), nullable=True)
     conditions = sa.Column(sa.String, nullable=True)
     stake = sa.Column(sa.Integer, nullable=True)
-    arjel_level = sa.Column(sa.String, nullable=True)
     distance = sa.Column(sa.Integer, nullable=False)
     friendly_URL = sa.Column(sa.String, nullable=True)
     pronostic = sa.Column(sa.String, nullable=True)
@@ -33,6 +34,15 @@ class Race(Base):
 
     runners = relationship("Runner", backref="race")
 
+    @property
+    def horse_show_unibet_n(self)->int:
+        return self.horse_show.unibet_n
+
+    @property
+    def unibet_code(self)->Tuple[dt.date, int, int]:
+        return self.date, self.horse_show_unibet_n, self.unibet_n
+
+
     @classmethod
     def upsert(
         cls,
@@ -41,7 +51,7 @@ class Race(Base):
         race_name: str,
         race_start_at: dt.datetime,
         race_date: dt.date,
-        race_type: str,
+        race_type: UnibetRaceType,
         race_conditions: str,
         race_stake: int,
         race_arjel_level: str,
@@ -52,13 +62,14 @@ class Race(Base):
         db_session: SQLAlchemySession,
     ) -> "Race":
 
+        assert race_arjel_level == "2"
+
         found_race = (
             db_session.query(Race)
             .filter(Race.unibet_id == race_unibet_id)
             .one_or_none()
         )
         if found_race is not None:
-            assert found_race.unibet_id == race_unibet_id
             assert found_race.name == race_name
             assert found_race.start_at == race_start_at
             assert found_race.date == race_date
@@ -66,7 +77,6 @@ class Race(Base):
             assert found_race.type == race_type
             assert found_race.conditions == race_conditions
             assert found_race.stake == race_stake
-            assert found_race.arjel_level == race_arjel_level
             assert found_race.distance == race_distance
             assert found_race.friendly_URL == race_friendly_url
             assert found_race.pronostic == race_pronostic
@@ -83,7 +93,6 @@ class Race(Base):
             type=race_type,
             conditions=race_conditions,
             stake=race_stake,
-            arjel_level=race_arjel_level,
             distance=race_distance,
             friendly_URL=race_friendly_url,
             pronostic=race_pronostic,

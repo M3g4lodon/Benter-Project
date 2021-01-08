@@ -59,7 +59,7 @@ def convert_duration_in_sec(time_str: Optional[str]) -> Optional[float]:
         else matches
     )
     if not matches:
-        logger.warning("Could not convert %s in duration", time_str)
+        logger.warning("Could not convert '%s' in duration", time_str)
         return None
 
     n_min, n_sec, n_cs = matches.groups()

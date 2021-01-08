@@ -1,9 +1,11 @@
-from typing import Optional, Tuple
 import datetime as dt
+from typing import Optional
+from typing import Tuple
 
 import sqlalchemy as sa
 
-from constants import UnibetBlinkers, UnibetCoat
+from constants import UnibetBlinkers
+from constants import UnibetCoat
 from constants import UnibetHorseSex
 from constants import UnibetShoes
 from database.setup import SQLAlchemySession
@@ -46,7 +48,9 @@ class Runner(Base):
     team = sa.Column(
         sa.Integer, nullable=False, index=True
     )  # team number in race 0 means no team, 1 first team and so on...
-    coat = sa.Column(sa.Enum(UnibetCoat), nullable=True, index=True)  # in French "robe", equine color
+    coat = sa.Column(
+        sa.Enum(UnibetCoat), nullable=True, index=True
+    )  # in French "robe", equine color
     origins = sa.Column(sa.String, nullable=True, index=False)
     comment = sa.Column(sa.String, nullable=True, index=False)
     length = sa.Column(sa.String, nullable=True, index=True)
@@ -85,19 +89,19 @@ class Runner(Base):
     final_odds = sa.Column(sa.Float, nullable=True, index=True)
 
     @property
-    def date(self)->dt.date:
+    def date(self) -> dt.date:
         return self.race.date
 
     @property
-    def horse_show_unibet_n(self)->int:
+    def horse_show_unibet_n(self) -> int:
         return self.race.horse_show.unibet_n
 
     @property
-    def race_unibet_n(self)->int:
+    def race_unibet_n(self) -> int:
         return self.race.unibet_n
 
     @property
-    def unibet_code(self)->Tuple[dt.date, int, int, int]:
+    def unibet_code(self) -> Tuple[dt.date, int, int, int]:
         return self.date, self.horse_show_unibet_n, self.race_unibet_n, self.unibet_n
 
     @classmethod
@@ -117,7 +121,7 @@ class Runner(Base):
         age: Optional[int],
         team: int,
         coat: UnibetCoat,
-        origins: str,
+        origins: Optional[str],
         comment: Optional[str],
         length: str,
         rope_n: Optional[int],

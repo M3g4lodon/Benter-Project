@@ -2,15 +2,18 @@ import datetime as dt
 import json
 import os
 import re
-from typing import Set, Dict
+from typing import Dict
 from typing import Optional
+from typing import Set
 from typing import Tuple
 
-import tqdm
 import Levenshtein as lev
+import tqdm
 
-from constants import UNIBET_MIN_DATE, UnibetCoat, DATA_DIR
+from constants import DATA_DIR
+from constants import UNIBET_MIN_DATE
 from constants import UnibetBlinkers
+from constants import UnibetCoat
 from constants import UnibetHorseSex
 from constants import UnibetHorseShowGround
 from constants import UnibetProbableType
@@ -24,8 +27,9 @@ from models.horse_show import HorseShow
 from models.race import Race
 from models.race_track import RaceTrack
 from models.runner import Runner
-from utils import convert_duration_in_sec, unibet_coat_parser
+from utils import convert_duration_in_sec
 from utils import date_countdown_generator
+from utils import unibet_coat_parser
 from utils.logger import setup_logger
 
 UNIBET_DATA_PATH = "./data/Unibet"
@@ -102,7 +106,7 @@ def _process_horse_show(
 
 def _get_or_create_parent(
     parent_id: Optional[int],
-    name_country: str,
+    name_country: Optional[str],
     is_born_male: bool,
     db_session: SQLAlchemySession,
 ) -> Optional[Horse]:
@@ -143,7 +147,10 @@ def _get_or_create_parent(
 
 
 def _get_or_create_parents(
-    horse_id: Optional[int], parent_names: str, db_session: SQLAlchemySession
+    horse_id: Optional[int],
+    parent_names: Optional[str],
+    parent_name_mapping: dict,
+    db_session: SQLAlchemySession,
 ) -> Tuple[Optional[Horse], Optional[Horse]]:
     father_id, mother_id = None, None
     if horse_id is not None:
@@ -152,7 +159,9 @@ def _get_or_create_parents(
         if found_horse.father_id and found_horse.mother_id:
             return found_horse.father, found_horse.mother
 
-    father_name, mother_name = _split_parent_names(parent_names=parent_names)
+    father_name, mother_name = _split_parent_names(
+        parent_names=parent_names, parent_name_mapping=parent_name_mapping
+    )
 
     father = _get_or_create_parent(
         parent_id=father_id,
@@ -386,7 +395,8 @@ def _process_horse(
     name_country_from_info: Optional[str],
     name_country_from_runner: str,
     is_born_male: Optional[bool],
-    parent_names: str,
+    parent_names: Optional[str],
+    parent_name_mapping: dict,
     birth_year: Optional[int],
     db_session: SQLAlchemySession,
 ) -> Horse:
@@ -403,7 +413,10 @@ def _process_horse(
     assert country_code
 
     father, mother = _get_or_create_parents(
-        horse_id=horse_id, parent_names=parent_names, db_session=db_session
+        horse_id=horse_id,
+        parent_names=parent_names,
+        parent_name_mapping=parent_name_mapping,
+        db_session=db_session,
     )
     if horse_id is not None:
         found_horse = db_session.query(Horse).filter(Horse.id == horse_id).one()
@@ -504,6 +517,7 @@ def _process_runner(
     runner_stats: dict,
     race: Race,
     current_race_dict: dict,
+    parent_name_mapping: dict,
     db_session: SQLAlchemySession,
 ) -> None:
     unibet_id = runner_dict["zeturfId"]
@@ -592,6 +606,7 @@ def _process_runner(
         name_country_from_runner=runner_dict["name"],
         is_born_male=is_born_male,
         parent_names=parent_names,
+        parent_name_mapping=parent_name_mapping,
         birth_year=birth_year,
         db_session=db_session,
     )
@@ -753,9 +768,13 @@ def _get_parent_names(
     return parent_names
 
 
-def _split_parent_names(parent_names: str) -> Tuple[Optional[str], Optional[str]]:
+def _split_parent_names(
+    parent_names: Optional[str], parent_name_mapping: dict
+) -> Tuple[Optional[str], Optional[str]]:
     if not parent_names:
         return None, None
+    if parent_names in parent_name_mapping:
+        return parent_name_mapping[parent_names]
     father_mother_names = re.split(r"[-/]", parent_names)
     if len(father_mother_names) != 2:
         father_mother_names = re.split(r"\s[-/]\s", parent_names)
@@ -777,15 +796,22 @@ def _split_parent_names(parent_names: str) -> Tuple[Optional[str], Optional[str]
 
 
 def _resolve_parent_names_from_already_names(
-    male_names: Set[str], female_names: Set[str], not_understood_parent_names: Set[str]
+    male_names: Set[str],
+    female_names: Set[str],
+    not_understood_parent_names: Set[str],
+    current_parent_name_mapping: Dict[str, Tuple[str, str]],
 ) -> Dict[str, Tuple[str, str]]:
 
-    parent_name_mapping: Dict[str, Tuple[str, str]] = {}
+    parent_name_mapping = current_parent_name_mapping
     for parent_name in tqdm.tqdm(
         not_understood_parent_names, total=len(not_understood_parent_names)
     ):
         if not parent_name:
             continue
+
+        if parent_name in parent_name_mapping:
+            continue
+
         matching_mother_names = []
         matching_father_names = []
         for male_name in male_names:
@@ -809,15 +835,20 @@ def _resolve_parent_names_from_already_names(
         if matching_father_names:
             matched_father_name = max(matching_father_names, key=len)
 
-        if (len(matched_mother_name or "") + len(matching_father_names or "")) >= len(
+        if (len(matched_mother_name or "") + len(matched_father_name or "")) > len(
             parent_name
         ):
-            logger.warning(f"Error with {parent_name}")
+            logger.warning(
+                """Error with "%s": found mother_name (%s), found father_name (%s)""",
+                parent_name,
+                matched_mother_name,
+                matched_father_name,
+            )
             continue
 
         if matched_mother_name and not matched_father_name:
             new_father_name = re.sub(
-                fr"\b{matched_mother_name.upper()}$","", parent_name.upper()
+                fr"\b{matched_mother_name.upper()}$", "", parent_name.upper()
             )
             new_father_name = new_father_name.strip()
             if not new_father_name:
@@ -847,13 +878,16 @@ def pre_run():
     """
     The goal of this function is to generate a json with hard to identify parent names.
     """
+
+    with open(os.path.join(DATA_DIR, "unibet_parent_name_mapping.json"), "r") as fp:
+        current_parent_name_mapping = json.load(fp=fp)
+
     male_names = set()
     female_names = set()
     not_understood_parent_names = set()
     for date in tqdm.tqdm(
         date_countdown_generator(
-            start_date=UNIBET_MIN_DATE,
-            end_date=dt.date.today() - dt.timedelta(days=1),
+            start_date=UNIBET_MIN_DATE, end_date=dt.date.today() - dt.timedelta(days=1)
         ),
         total=(dt.date.today() - dt.timedelta(days=1) - UNIBET_MIN_DATE).days,
         unit="days",
@@ -916,7 +950,12 @@ def pre_run():
                         parent_name = _get_parent_names(
                             runner_dict=runner_dict, runner_stats_info=runner_stats_info
                         )
-                        father_name, mother_name = _split_parent_names(parent_name)
+                        if parent_name in current_parent_name_mapping:
+                            continue
+                        father_name, mother_name = _split_parent_names(
+                            parent_names=parent_name,
+                            parent_name_mapping=current_parent_name_mapping,
+                        )
                         father_name, _ = _extract_name_country(name_country=father_name)
                         mother_name, _ = _extract_name_country(name_country=mother_name)
                         if father_name is None and mother_name is None:
@@ -927,14 +966,16 @@ def pre_run():
                         if mother_name:
                             female_names.add(mother_name)
     logger.info(
-        f"{len(male_names)} male names, "
-        f"{len(female_names)} female names, "
-        f"{len(not_understood_parent_names)} not understood parent names"
+        "%s male names, %s female names, %s not understood parent names",
+        len(male_names),
+        len(female_names),
+        len(not_understood_parent_names),
     )
     parent_name_mapping = _resolve_parent_names_from_already_names(
         male_names=male_names,
         female_names=female_names,
         not_understood_parent_names=not_understood_parent_names,
+        current_parent_name_mapping=current_parent_name_mapping,
     )
 
     with open(os.path.join(DATA_DIR, "unibet_parent_name_mapping.json"), "w+") as fp:
@@ -943,6 +984,8 @@ def pre_run():
 
 def run():  # pylint:disable=too-many-branches
     with create_sqlalchemy_session() as db_session:
+        with open(os.path.join(DATA_DIR, "unibet_parent_name_mapping.json"), "r") as fp:
+            parent_name_mapping = json.load(fp=fp)
         for date in tqdm.tqdm(
             date_countdown_generator(
                 start_date=UNIBET_MIN_DATE,
@@ -1006,9 +1049,14 @@ def run():  # pylint:disable=too-many-branches
                                 runner_stats=runner_stats,
                                 race=race,
                                 current_race_dict=current_race_dict,
+                                parent_name_mapping=parent_name_mapping,
                                 db_session=db_session,
                             )
 
 
 if __name__ == "__main__":
-    pre_run()
+    # print("Generating hard to identify parent names mapping from already "
+    #       "known horse names...")
+    # pre_run()
+    print("Backfilling to DB")
+    run()

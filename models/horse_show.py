@@ -1,4 +1,5 @@
 import datetime as dt
+from typing import Optional
 from typing import Tuple
 
 import sqlalchemy as sa
@@ -27,9 +28,8 @@ class HorseShow(Base):
     races = relationship("Race", backref="horse_show")
 
     @property
-    def unibet_code(self)->Tuple[dt.date, int]:
+    def unibet_code(self) -> Tuple[dt.date, int]:
         return self.datetime.date(), self.unibet_n
-
 
     @classmethod
     def upsert(
@@ -41,17 +41,16 @@ class HorseShow(Base):
         race_track: RaceTrack,
         db_session: SQLAlchemySession,
     ):
-        found_horse_show = (
+        found_horse_show: Optional[HorseShow] = (
             db_session.query(HorseShow)
-            .filter(
-                HorseShow.unibet_n == horse_show_unibet_n,
-                sa.func.date(HorseShow.datetime) == horse_show_datetime.date(),
-            )
+            .filter(HorseShow.unibet_id == horse_show_unibet_id)
             .one_or_none()
         )
 
         if found_horse_show is not None:
             assert found_horse_show.unibet_id == horse_show_unibet_id
+            assert found_horse_show.unibet_n == horse_show_unibet_n
+            assert found_horse_show.datetime == horse_show_datetime
             assert found_horse_show.ground == horse_show_ground
             assert found_horse_show.race_track_id == race_track.id
             assert found_horse_show.id

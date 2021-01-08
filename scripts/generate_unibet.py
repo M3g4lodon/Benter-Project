@@ -60,8 +60,9 @@ def _process_race(
     race_start_at = dt.datetime.fromtimestamp(current_race_dict["starttime"] / 1000)
     race_date = dt.date.fromisoformat(current_race_dict["date"])
     race_meeting_id = current_race_dict["meetingId"]
-    assert race_start_at.date() == race_date
-    assert race_meeting_id == horse_show.unibet_id
+    assert (
+        race_meeting_id == horse_show.unibet_id
+    ), f"{race_meeting_id} != {horse_show.unibet_id}"
     race = Race.upsert(
         race_unibet_id=current_race_dict["zeturfId"],
         race_unibet_n=current_race_dict["rank"],
@@ -235,45 +236,8 @@ def _check_update_or_create_horse(
                 db_session=db_session,
             )
 
-    if is_born_male and found_horse.is_born_male:
-        if is_born_male != found_horse.is_born_male:
-            return _create_horse(
-                name=name,
-                country_code=country_code,
-                father=father,
-                mother=mother,
-                parent_names=parent_names,
-                birth_year=birth_year,
-                is_born_male=is_born_male,
-                db_session=db_session,
-            )
-    if country_code and found_horse.country_code:
-        if country_code != found_horse.country_code:
-            return _create_horse(
-                name=name,
-                country_code=country_code,
-                father=father,
-                mother=mother,
-                parent_names=parent_names,
-                birth_year=birth_year,
-                is_born_male=is_born_male,
-                db_session=db_session,
-            )
     if is_born_male is not None and found_horse.is_born_male is not None:
         if is_born_male != found_horse.is_born_male:
-            return _create_horse(
-                name=name,
-                country_code=country_code,
-                father=father,
-                mother=mother,
-                parent_names=parent_names,
-                birth_year=birth_year,
-                is_born_male=is_born_male,
-                db_session=db_session,
-            )
-
-    if parent_names and found_horse.first_found_origins:
-        if parent_names != found_horse.first_found_origins:
             return _create_horse(
                 name=name,
                 country_code=country_code,
@@ -431,13 +395,6 @@ def _process_horse(
             if horse.is_born_male is is_born_male or horse.is_born_male is None
         ]
 
-    if country_code:
-        current_horses = [
-            horse
-            for horse in current_horses
-            if horse.country_code == country_code or horse.country_code is None
-        ]
-
     if father:
         current_horses = [
             horse
@@ -450,13 +407,6 @@ def _process_horse(
             horse
             for horse in current_horses
             if horse.mother_id == mother.id or horse.mother_id is None
-        ]
-    if parent_names:
-        current_horses = [
-            horse
-            for horse in current_horses
-            if horse.first_found_origins == parent_names
-            or horse.first_found_origins is None
         ]
     if not current_horses:
         return _create_horse(
@@ -551,11 +501,11 @@ def _process_runner(
         race.type = runner_stats_info["discipline"]
         db_session.commit()
 
-    owner_name = runner_stats_info["proprietaire"] if runner_stats_info else None
+    owner_name = runner_dict["details"]["owner"] if runner_dict["details"] else None
     owner_name = None if not isinstance(owner_name, str) else owner_name
     owner_name = (
-        runner_dict["details"]["owner"]
-        if runner_dict["details"] and owner_name is None
+        runner_stats_info["proprietaire"]
+        if runner_stats_info and owner_name is None
         else owner_name
     )
     owner_name = None if not isinstance(owner_name, str) else owner_name
@@ -565,11 +515,10 @@ def _process_runner(
         name=owner_name,
         db_session=db_session,
     )
-    trainer_name = runner_stats_info["entraineur"] if runner_stats_info else None
     trainer_name = (
         runner_dict["details"]["trainer"]
-        if runner_dict["details"] and trainer_name is None
-        else trainer_name
+        if runner_dict["details"]
+        else (runner_stats_info["entraineur"] if runner_stats_info else None)
     )
 
     trainer = Person.upsert(
@@ -578,12 +527,9 @@ def _process_runner(
         db_session=db_session,
     )
 
-    jockey_name = (
-        runner_stats_info["jockey"] if runner_stats_info else runner_dict["jockey"]
-    )
     jockey = Person.upsert(
         person_id=(found_runner.jockey_id if found_runner else None),
-        name=jockey_name,
+        name=runner_dict["jockey"],
         db_session=db_session,
     )
 
@@ -622,28 +568,15 @@ def _process_runner(
     ):
         coat = unibet_coat_parser.get_coat(runner_stats_info.get("robe"))
 
-    # blinkers in runner_dict are more precise than in runner_stats_info
     blinkers = UnibetBlinkers(runner_dict["blinkers"])
 
-    # historical_stakes_at_query_time: Optional[int] = runner_stats_info.get(
-    #     "gain"
-    # ) if runner_stats_info else None
     stakes = (
         runner_dict["details"].get("stakes") if runner_dict.get("details") else None
     )
 
-    music: Optional[str] = (
-        runner_stats_info.get("musique") if runner_stats_info else None
-    )
     music = (
-        runner_dict["details"].get("musique")
-        if runner_dict.get("details") and music is None
-        else music
+        runner_dict["details"].get("musique") if runner_dict.get("details") else None
     )
-
-    record = runner_stats_info.get("record") if runner_stats_info else None
-    record = record if isinstance(record, str) else None
-    kilometer_record_sec = convert_duration_in_sec(record)
 
     shoes = UnibetShoes(runner_dict["shoes"])
     morning_odds, final_odds = None, None
@@ -706,7 +639,6 @@ def _process_runner(
         comment=runner_dict["details"].get("comment")
         if runner_dict.get("details")
         else None,
-        kilometer_record_sec=kilometer_record_sec,
         owner=owner,
         trainer=trainer,
         jockey=jockey,

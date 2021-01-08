@@ -54,7 +54,6 @@ class Runner(Base):
     origins = sa.Column(sa.String, nullable=True, index=False)
     comment = sa.Column(sa.String, nullable=True, index=False)
     length = sa.Column(sa.String, nullable=True, index=True)
-    kilometer_record_sec = sa.Column(sa.Float, nullable=True, index=True)
 
     owner_id = sa.Column(
         sa.Integer,
@@ -125,7 +124,6 @@ class Runner(Base):
         comment: Optional[str],
         length: str,
         rope_n: Optional[int],
-        kilometer_record_sec: Optional[float],
         owner: Optional[Person],
         trainer: Optional[Person],
         jockey: Optional[Person],
@@ -175,7 +173,6 @@ class Runner(Base):
             assert found_runner.morning_odds == morning_odds
             assert found_runner.final_odds == final_odds
             assert found_runner.rope_n == rope_n
-            assert found_runner.kilometer_record_sec == kilometer_record_sec
             assert found_runner.id
             return found_runner
 
@@ -198,7 +195,6 @@ class Runner(Base):
             comment=comment,
             length=length,
             rope_n=rope_n,
-            kilometer_record_sec=kilometer_record_sec,
             owner_id=owner.id if owner else None,
             trainer_id=trainer.id if trainer else None,
             jockey_id=jockey.id if jockey else None,

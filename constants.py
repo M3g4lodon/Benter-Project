@@ -252,6 +252,7 @@ class UnibetShoes(Enum):
     FIST_TIME_FRONT_UNSHOD = "B"
     FRONT_UNSHOD = "A"
 
+
 # https://www.lexiqueducheval.net/lexique_sommaire.html
 class UnibetCoat(Enum):
     UNKNOWN = None
@@ -294,3 +295,6 @@ class UnibetCoat(Enum):
     SABINO = "SABINO"
     MEDLEY_BAY = "MEDLEY_BAY"
     MEDLEY_SABINO = "MEDLEY_SABINO"
+
+
+UNIBET_DATA_PATH = "./data/Unibet"

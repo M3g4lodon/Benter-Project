@@ -80,10 +80,11 @@ class LogisticRegressionModel(SequentialMixin, AbstractWinningModel):
         return model
 
 
+from joblib import Parallel, delayed
+from scipy import optimize
+
 #### SCRIPT Don't use it
 from constants import SOURCE_PMU
-from scipy import optimize
-from joblib import Parallel, delayed
 
 
 def compute_log_likelihood(intercept_weights):
@@ -136,7 +137,7 @@ class ClassesFreeMultinomialLogisticRegression(SequentialMixin, AbstractWinningM
         ) as fp:
             shared_weights = json.load(fp=fp)
 
-        weights0 = np.array(shared_weights["weights"]).reshape((-1))
+        weights0 = np.array(shared_weights["weights"]).reshape(-1)
 
         intercept0 = shared_weights["bias"][0]
         self.weights = weights0

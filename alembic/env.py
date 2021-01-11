@@ -22,11 +22,11 @@ fileConfig(config.config_file_name)
 # for 'autogenerate' support
 # pylint:disable=wrong-import-position
 from models.base import Base
+from models.horse import Horse  # pylint:disable=unused-import
 from models.horse_show import HorseShow  # pylint:disable=unused-import
-from models.race_track import RaceTrack  # pylint:disable=unused-import
 from models.person import Person  # pylint:disable=unused-import
 from models.race import Race  # pylint:disable=unused-import
-from models.horse import Horse  # pylint:disable=unused-import
+from models.race_track import RaceTrack  # pylint:disable=unused-import
 from models.runner import Runner  # pylint:disable=unused-import
 
 # pylint:enable=wrong-import-position

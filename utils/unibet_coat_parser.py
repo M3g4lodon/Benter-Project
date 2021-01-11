@@ -1,9 +1,8 @@
-from typing import Optional
 import itertools
+from typing import Optional
 
 import utils
 from constants import UnibetCoat
-
 
 logger = utils.setup_logger(name=__name__)
 
@@ -45,7 +44,7 @@ def get_coat(coat: Optional[str]) -> UnibetCoat:
         return UnibetCoat.UNKNOWN
 
     if not isinstance(coat, str):
-        logger.warning("Can not parse coat %s of type %s", coat, type(coat))
+        logger.warning('Can not parse coat "%s" of type "%s"', coat, type(coat))
         return UnibetCoat.UNKNOWN
 
     lowered_stripped_coat = coat.lower().strip()

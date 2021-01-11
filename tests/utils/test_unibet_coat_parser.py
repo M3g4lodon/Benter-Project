@@ -1,7 +1,7 @@
 import pytest
 
-from utils import unibet_coat_parser
 from constants import UnibetCoat
+from utils import unibet_coat_parser
 
 # No clue for SM and BM
 unknown_found_coats = ["4", "AT", "T"]

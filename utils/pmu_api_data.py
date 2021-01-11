@@ -470,7 +470,7 @@ def convert_queried_data_to_race_horse_df(
     """Will convert queried race horse df into the right format.
 
     If `historical_race_horse_df`is provided, the converted race/horses will be
-    formatted as an extension of it """
+    formatted as an extension of it"""
 
     race_horse_df = queried_race_horse_df
 

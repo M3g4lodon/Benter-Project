@@ -35,13 +35,12 @@ class Race(Base):
     runners = relationship("Runner", backref="race")
 
     @property
-    def horse_show_unibet_n(self)->int:
+    def horse_show_unibet_n(self) -> int:
         return self.horse_show.unibet_n
 
     @property
-    def unibet_code(self)->Tuple[dt.date, int, int]:
+    def unibet_code(self) -> Tuple[dt.date, int, int]:
         return self.date, self.horse_show_unibet_n, self.unibet_n
-
 
     @classmethod
     def upsert(

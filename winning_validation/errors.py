@@ -167,7 +167,7 @@ def compute_validation_error(
 
 
 def compute_overall_average(
-    validation_errors: dict
+    validation_errors: dict,
 ) -> Tuple[Optional[float], Optional[float], Optional[float]]:
 
     validation_values = []

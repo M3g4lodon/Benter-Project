@@ -11,6 +11,7 @@ import Levenshtein as lev
 import tqdm
 
 from constants import DATA_DIR
+from constants import UNIBET_DATA_PATH
 from constants import UNIBET_MIN_DATE
 from constants import UnibetBlinkers
 from constants import UnibetCoat
@@ -31,8 +32,11 @@ from utils import convert_duration_in_sec
 from utils import date_countdown_generator
 from utils import unibet_coat_parser
 from utils.logger import setup_logger
+from utils.music import is_matching_with_max_offset
+from utils.music import parse_unibet_music
+from utils.music import ParsedMusic
 
-UNIBET_DATA_PATH = "./data/Unibet"
+MAX_MUSIC_MTCHING_OFFSET = 8
 
 logger = setup_logger(name=__file__)
 
@@ -117,7 +121,7 @@ def _get_or_create_parent(
 
     if not name_country:
         logger.warning(
-            "Could not find %s name with name: %s",
+            'Could not find %s name with name: "%s"',
             ("father" if is_born_male else "mother"),
             name_country,
         )
@@ -137,6 +141,18 @@ def _get_or_create_parent(
         return potential_parents[0]
 
     assert len(potential_parents) > 1
+    potential_parents = [
+        parent for parent in potential_parents if parent.country_code == country_code
+    ]
+
+    if not potential_parents:
+        parent = Horse(name=name, is_born_male=is_born_male, country_code=country_code)
+        db_session.add(parent)
+        db_session.commit()
+        return parent
+    if len(potential_parents) == 1:
+        return potential_parents[0]
+
     logger.warning(
         "Too many %s (%s) found for name: %s (%s)",
         ("fathers" if is_born_male else "mothers"),
@@ -222,19 +238,6 @@ def _check_update_or_create_horse(
 
     assert found_horse.name
     assert found_horse.name == name
-
-    if country_code and found_horse.country_code:
-        if country_code != found_horse.country_code:
-            return _create_horse(
-                name=name,
-                country_code=country_code,
-                father=father,
-                mother=mother,
-                parent_names=parent_names,
-                birth_year=birth_year,
-                is_born_male=is_born_male,
-                db_session=db_session,
-            )
 
     if is_born_male is not None and found_horse.is_born_male is not None:
         if is_born_male != found_horse.is_born_male:
@@ -362,6 +365,7 @@ def _process_horse(
     parent_names: Optional[str],
     parent_name_mapping: dict,
     birth_year: Optional[int],
+    parsed_music: Optional[ParsedMusic],
     db_session: SQLAlchemySession,
 ) -> Horse:
 
@@ -408,6 +412,47 @@ def _process_horse(
             for horse in current_horses
             if horse.mother_id == mother.id or horse.mother_id is None
         ]
+    if not current_horses:
+        return _create_horse(
+            name=name,
+            country_code=country_code,
+            father=father,
+            mother=mother,
+            parent_names=parent_names,
+            birth_year=birth_year,
+            is_born_male=is_born_male,
+            db_session=db_session,
+        )
+    if len(current_horses) == 1:
+        found_horse = current_horses[0]
+        return _check_update_or_create_horse(
+            found_horse=found_horse,
+            name=name,
+            is_born_male=is_born_male,
+            country_code=country_code,
+            father=father,
+            mother=mother,
+            parent_names=parent_names,
+            origins=parent_names,
+            birth_year=birth_year,
+            db_session=db_session,
+        )
+
+    if parsed_music:
+        current_horses = [
+            horse
+            for horse in current_horses
+            if horse.runners
+            and is_matching_with_max_offset(
+                future_music=parsed_music,
+                past_music=parse_unibet_music(
+                    current_year=horse.runners[-1].date.year,
+                    music=horse.runners[-1].music,
+                ),
+                max_offset=MAX_MUSIC_MTCHING_OFFSET,
+            )
+            is not False
+        ] + [horse for horse in current_horses if not horse.runners]
     if not current_horses:
         return _create_horse(
             name=name,
@@ -546,6 +591,14 @@ def _process_runner(
         runner_dict=runner_dict, runner_stats_info=runner_stats_info
     )
     birth_year = runner_stats_info.get("age") if runner_stats_info else None
+
+    music = (
+        runner_dict["details"].get("musique") if runner_dict.get("details") else None
+    )
+    parsed_music = parse_unibet_music(current_year=race.date.year, music=music)
+    if parsed_music is None and music:
+        logger.warning('Can not parse music "%s"', music)
+
     horse = _process_horse(
         horse_id=(found_runner.horse_id if found_runner else None),
         name_country_from_info=runner_stats_info["nom"] if runner_stats_info else None,
@@ -554,6 +607,7 @@ def _process_runner(
         parent_names=parent_names,
         parent_name_mapping=parent_name_mapping,
         birth_year=birth_year,
+        parsed_music=parsed_music,
         db_session=db_session,
     )
 
@@ -572,10 +626,6 @@ def _process_runner(
 
     stakes = (
         runner_dict["details"].get("stakes") if runner_dict.get("details") else None
-    )
-
-    music = (
-        runner_dict["details"].get("musique") if runner_dict.get("details") else None
     )
 
     shoes = UnibetShoes(runner_dict["shoes"])
@@ -717,7 +767,7 @@ def _split_parent_names(
 
     if len(father_mother_names) != 2:
         logger.warning(
-            "Could not find father mother names in origins: %s", parent_names
+            'Could not find father mother names in origins: "%s"', parent_names
         )
         return None, None
 

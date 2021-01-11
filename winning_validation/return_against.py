@@ -169,7 +169,7 @@ def compute_return_against_odds(
 
 
 def compute_overall_average(
-    return_against_odds: dict
+    return_against_odds: dict,
 ) -> Tuple[Optional[float], Optional[float], Optional[float], Optional[float]]:
 
     predicted_returns = []

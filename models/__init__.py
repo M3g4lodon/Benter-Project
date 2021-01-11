@@ -6,3 +6,5 @@ from models.person import Person
 from models.race import Race
 from models.horse import Horse
 from models.runner import Runner
+
+__all__ = ["Horse", "HorseShow", "Person", "Race", "RaceTrack", "Runner"]

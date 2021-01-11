@@ -12,7 +12,6 @@ from utils.features import check_df
 from utils.pmu_api_data import convert_queried_data_to_race_horse_df
 from utils.pmu_api_data import get_race_horses_records
 
-
 # TODO investigate driverchange column
 # TODO investigate 'engagement' column
 

@@ -10,7 +10,7 @@ repos:
           - -rn
 
   - repo: https://github.com/psf/black
-    rev: 19.3b0
+    rev: 20.8b1
     hooks:
       - id: black
         language_version: python3.7
@@ -76,3 +76,8 @@ repos:
       - id: python-no-log-warn
       - id: python-use-type-annotations
       - id: rst-backticks
+
+  - repo: https://github.com/asottile/pyupgrade
+    rev: v2.7.4
+    hooks:
+    -   id: pyupgrade

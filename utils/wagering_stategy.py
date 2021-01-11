@@ -71,15 +71,18 @@ def compute_expected_return(
             np.round(actual_betting),
         )
 
-        expected_return = np.where(
-            y_race == 1,
-            get_race_odds(
-                track_take=track_take,
-                previous_stakes=race_df["totalEnjeu"],
-                race_bet=actual_betting,
-            ),
-            np.zeros_like(actual_betting),
-        ).sum() - np.sum(actual_betting)
+        expected_return = (
+            np.where(
+                y_race == 1,
+                get_race_odds(
+                    track_take=track_take,
+                    previous_stakes=race_df["totalEnjeu"],
+                    race_bet=actual_betting,
+                ),
+                np.zeros_like(actual_betting),
+            ).sum()
+            - np.sum(actual_betting)
+        )
         relative_expected_return = expected_return / np.sum(actual_betting)
         records.append(
             {
@@ -233,15 +236,18 @@ def compute_scenario(
         )
 
         capital_value_old = capital_value
-        capital_value += np.where(
-            y_race == 1,
-            get_race_odds(
-                track_take=track_take,
-                previous_stakes=race_df["totalEnjeu"],
-                race_bet=actual_betting,
-            ),
-            np.zeros_like(actual_betting),
-        ).sum() - np.sum(actual_betting)
+        capital_value += (
+            np.where(
+                y_race == 1,
+                get_race_odds(
+                    track_take=track_take,
+                    previous_stakes=race_df["totalEnjeu"],
+                    race_bet=actual_betting,
+                ),
+                np.zeros_like(actual_betting),
+            ).sum()
+            - np.sum(actual_betting)
+        )
 
         records.append(
             {

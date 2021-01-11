@@ -18,7 +18,7 @@ def run():  # pylint:disable=too-many-branches
 
         nc_horses = (
             db_session.query(Horse)
-            .filter(Horse.name.op("~")(".*[\(\{](.*)[\)\}]"))
+            .filter(Horse.name.op("~")(r".*[\(\{](.*)[\)\}]"))
             .all()
         )
         for horse in nc_horses:

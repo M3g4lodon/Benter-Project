@@ -10,21 +10,43 @@ from utils import setup_logger
 logger = setup_logger(name=__name__)
 
 
+class EntityPerson(Base):
+    __tablename__ = "entity_person"
+    entity_id = sa.Column(sa.Integer, sa.ForeignKey("entities.id"), primary_key=True)
+    person_id = sa.Column(sa.Integer, sa.ForeignKey("persons.id"), primary_key=True)
+    person = relationship("Person", back_populates="entities")
+    entity = relationship("Entity", back_populates="persons")
+
+    @classmethod
+    def upsert(
+        cls,
+        person: "Person",
+        entity: "Entity",
+        db_session: SQLAlchemySession,
+    ) -> "EntityPerson":
+        found_association = (
+            db_session.query(EntityPerson)
+            .filter(EntityPerson.entity_id == entity.id)
+            .filter(EntityPerson.person_id == person.id)
+            .one_or_none()
+        )
+
+        if found_association is not None:
+            return found_association
+
+        association = EntityPerson(entity_id=entity.id, person_id=person.id)
+        db_session.add(association)
+        db_session.commit()
+        return association
+
+
 class Person(Base):
     __tablename__ = "persons"
 
     id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
     name = sa.Column(sa.String, unique=False, nullable=False, index=True)
 
-    runners_as_jockey = relationship(
-        "Runner", backref="jockey", foreign_keys="Runner.jockey_id"
-    )
-    runners_as_owner = relationship(
-        "Runner", backref="owner", foreign_keys="Runner.owner_id"
-    )
-    runners_as_trainer = relationship(
-        "Runner", backref="trainer", foreign_keys="Runner.trainer_id"
-    )
+    entities = relationship("EntityPerson", back_populates="person")
 
     @classmethod
     def upsert(

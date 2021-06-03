@@ -5,6 +5,8 @@ max-line-length = 88
 # https://github.com/psf/black/issues/315
 # https://github.com/psf/black/issues/52
 ignore = E203, W503
+per-file-ignores =
+    alembic/env.py:F401,E402
 exclude =
     .git,
     __pycache__,

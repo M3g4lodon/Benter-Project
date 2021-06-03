@@ -22,7 +22,7 @@ from constants import UnibetRaceType
 from constants import UnibetShoes
 from database.setup import create_sqlalchemy_session
 from database.setup import SQLAlchemySession
-from models import Person
+from models import Entity
 from models.horse import Horse
 from models.horse_show import HorseShow
 from models.race import Race
@@ -113,6 +113,7 @@ def _get_or_create_parent(
     parent_id: Optional[int],
     name_country: Optional[str],
     is_born_male: bool,
+    child_country_code: str,
     db_session: SQLAlchemySession,
 ) -> Optional[Horse]:
     if parent_id is not None:
@@ -120,7 +121,7 @@ def _get_or_create_parent(
         return found_parent
 
     if not name_country:
-        logger.warning(
+        logger.info(
             'Could not find %s name with name: "%s"',
             ("father" if is_born_male else "mother"),
             name_country,
@@ -141,9 +142,12 @@ def _get_or_create_parent(
         return potential_parents[0]
 
     assert len(potential_parents) > 1
-    potential_parents = [
-        parent for parent in potential_parents if parent.country_code == country_code
-    ]
+    if country_code:
+        potential_parents = [
+            parent
+            for parent in potential_parents
+            if parent.country_code in (country_code, None)
+        ]
 
     if not potential_parents:
         parent = Horse(name=name, is_born_male=is_born_male, country_code=country_code)
@@ -152,7 +156,22 @@ def _get_or_create_parent(
         return parent
     if len(potential_parents) == 1:
         return potential_parents[0]
+    assert len(potential_parents) > 1
 
+    potential_parents = [
+        parent
+        for parent in potential_parents
+        if parent.country_code in (child_country_code, None)
+    ]
+    if not potential_parents:
+        parent = Horse(name=name, is_born_male=is_born_male, country_code=country_code)
+        db_session.add(parent)
+        db_session.commit()
+        return parent
+    if len(potential_parents) == 1:
+        return potential_parents[0]
+
+    assert len(potential_parents) > 1
     logger.warning(
         "Too many %s (%s) found for name: %s (%s)",
         ("fathers" if is_born_male else "mothers"),
@@ -167,6 +186,7 @@ def _get_or_create_parents(
     horse_id: Optional[int],
     parent_names: Optional[str],
     parent_name_mapping: dict,
+    child_country_code: str,
     db_session: SQLAlchemySession,
 ) -> Tuple[Optional[Horse], Optional[Horse]]:
     father_id, mother_id = None, None
@@ -184,12 +204,14 @@ def _get_or_create_parents(
         parent_id=father_id,
         name_country=father_name,
         is_born_male=True,
+        child_country_code=child_country_code,
         db_session=db_session,
     )
     mother = _get_or_create_parent(
         parent_id=mother_id,
         name_country=mother_name,
         is_born_male=False,
+        child_country_code=child_country_code,
         db_session=db_session,
     )
     return father, mother
@@ -384,6 +406,7 @@ def _process_horse(
         horse_id=horse_id,
         parent_names=parent_names,
         parent_name_mapping=parent_name_mapping,
+        child_country_code=country_code,
         db_session=db_session,
     )
     if horse_id is not None:
@@ -507,6 +530,28 @@ def _process_horse(
     )
 
 
+def _filter_names(name: Optional[str]) -> Optional[str]:
+    if not isinstance(name, str):
+        logger.warning("Can not upsert person with name: %s", name)
+        return None
+
+    if not name:
+        return None
+    if not re.search(r"\w", name):
+        return None
+
+    name = name.strip()
+    if not name:
+        return None
+
+    if re.match(r"^\W.*", name):
+        name = re.sub(r"^\.", "", name).strip()
+        if not name:
+            return None
+
+    return name
+
+
 def _process_runner(
     runner_dict: dict,
     runner_stats: dict,
@@ -555,8 +600,8 @@ def _process_runner(
     )
     owner_name = None if not isinstance(owner_name, str) else owner_name
 
-    owner = Person.upsert(
-        person_id=(found_runner.owner_id if found_runner else None),
+    owner = Entity.upsert(
+        entity_id=(found_runner.owner_id if found_runner else None),
         name=owner_name,
         db_session=db_session,
     )
@@ -566,14 +611,14 @@ def _process_runner(
         else (runner_stats_info["entraineur"] if runner_stats_info else None)
     )
 
-    trainer = Person.upsert(
-        person_id=(found_runner.trainer_id if found_runner else None),
+    trainer = Entity.upsert(
+        entity_id=(found_runner.trainer_id if found_runner else None),
         name=trainer_name,
         db_session=db_session,
     )
 
-    jockey = Person.upsert(
-        person_id=(found_runner.jockey_id if found_runner else None),
+    jockey = Entity.upsert(
+        entity_id=(found_runner.jockey_id if found_runner else None),
         name=runner_dict["jockey"],
         db_session=db_session,
     )

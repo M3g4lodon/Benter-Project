@@ -9,8 +9,8 @@ from constants import UnibetCoat
 from constants import UnibetHorseSex
 from constants import UnibetShoes
 from database.setup import SQLAlchemySession
+from models import Entity
 from models import Horse
-from models import Person
 from models import Race
 from models.base import Base
 
@@ -57,21 +57,21 @@ class Runner(Base):
 
     owner_id = sa.Column(
         sa.Integer,
-        sa.ForeignKey("persons.id", ondelete="CASCADE"),
+        sa.ForeignKey("entities.id", ondelete="CASCADE"),
         nullable=True,
         index=True,
     )
 
     trainer_id = sa.Column(
         sa.Integer,
-        sa.ForeignKey("persons.id", ondelete="CASCADE"),
+        sa.ForeignKey("entities.id", ondelete="CASCADE"),
         nullable=True,
         index=True,
     )
 
     jockey_id = sa.Column(
         sa.Integer,
-        sa.ForeignKey("persons.id", ondelete="CASCADE"),
+        sa.ForeignKey("entities.id", ondelete="CASCADE"),
         nullable=True,
         index=True,
     )
@@ -124,9 +124,9 @@ class Runner(Base):
         comment: Optional[str],
         length: str,
         rope_n: Optional[int],
-        owner: Optional[Person],
-        trainer: Optional[Person],
-        jockey: Optional[Person],
+        owner: Optional[Entity],
+        trainer: Optional[Entity],
+        jockey: Optional[Entity],
         horse: Optional[Horse],
         position: Optional[int],
         race_duration_sec: Optional[float],

@@ -1,7 +1,7 @@
 import getpass
 import os
 
-ENVIRONMENT = os.environ["ENVIRONMENT"]
+ENVIRONMENT = os.environ.get("ENVIRONMENT", "development")
 assert ENVIRONMENT in ("development", "production")
 
 if ENVIRONMENT == "development":

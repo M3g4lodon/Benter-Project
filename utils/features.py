@@ -51,6 +51,7 @@ From past races
     max elo ranking father/mother/father_mother
     track draw advatage from historic
     already race together horse+driver
+    (fuzzy) same owner/trainer
 
 directly in course
 

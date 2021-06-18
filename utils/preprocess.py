@@ -112,7 +112,7 @@ def load_preprocess(source: str) -> Tuple[dict, dict]:
 def get_preprocessed_columns(source: str) -> List[str]:
     race_horse_df = import_data.load_featured_data(source=source)
     return list(
-        preprocess(race_horse_df=race_horse_df.iloc[:1, :], source="PMU").keys()
+        preprocess(race_horse_df=race_horse_df.iloc[:1, :], source=source).keys()
     )
 
 

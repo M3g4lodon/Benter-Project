@@ -40,6 +40,8 @@ setuptools.setup(
         "featuretools",
         "jupyter_contrib_nbextensions",
         "jupyter_nbextensions_configurator",
+        "fastparquet",
+        "tenacity",
     ],
     extras_require={
         "test": [

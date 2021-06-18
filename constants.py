@@ -91,6 +91,7 @@ PMU_MIN_DATE = dt.date(2013, 2, 20)
 # From PMU rules
 Betting = collections.namedtuple("Betting", ["name", "track_take"])
 
+# TODO: Update https://www.pmu.fr/turf/static/sinformer/prelevements/
 PMU_BETTINGS = [
     Betting("E_SIMPLE_GAGNANT", 0.139),
     Betting("e_simple_jackpot", 0.1725),

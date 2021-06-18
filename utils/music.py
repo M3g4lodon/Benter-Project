@@ -188,6 +188,9 @@ def parse_unibet_music(
     if music is None:
         return None
 
+    if pd.isnull(music):
+        return None
+
     if re.match(r"^\W*$", music):
         return None
 

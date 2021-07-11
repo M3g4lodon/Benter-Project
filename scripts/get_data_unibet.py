@@ -1,6 +1,7 @@
 import math
 import os
-from typing import List, Generator
+from typing import Iterator
+from typing import List
 
 import numpy as np
 import pandas as pd
@@ -27,9 +28,13 @@ def get_feature_for_runners(runner_ids: List[int], db_session) -> pd.DataFrame:
     horse_query = f"""
     select
     r.id,
+    r.horse_id,
     races.id,
     races.date,
+    races.start_at,
     r.music,
+    r.final_odds as odds,
+    r.position as horse_place,
     runners_with_history.n_horse_previous_races,
     runners_with_history.n_horse_previous_positions,
     runners_with_history.average_horse_position,
@@ -76,9 +81,13 @@ where
         db_session.execute(horse_query).fetchall(),
         columns=[
             "runner_id",
+            "horse_id",
             "race_id",
             "race_date",
+            "race_datetime",
             "music",
+            "odds",
+            "horse_place",
             "n_horse_previous_races",
             "n_horse_previous_positions",
             "average_horse_position",
@@ -144,6 +153,18 @@ where
         df_features = df_features.join(df_feature_sub, on="runner_id")
     df_features.fillna(value=np.nan, inplace=True)
     df_features["race_date"] = pd.to_datetime(df_features["race_date"])
+    df_features["horse_place"] = pd.to_numeric(
+        df_features["horse_place"], downcast="integer"
+    )
+    race_id_n_horses = {
+        race_id: n_horses
+        for (race_id, n_horses) in db_session.execute(
+            f"""select r.race_id, count(1) as "n_horses"
+    from runners r
+    group by r.race_id"""
+        ).fetchall()
+    }
+    df_features["n_horses"] = df_features["race_id"].map(race_id_n_horses)
     return df_features
 
 
@@ -189,7 +210,7 @@ def fusion_horse_feature(row):
     return pd.Series({"mean_horse_place": mean_place, "average_horse_top_1": win_ratio})
 
 
-def chunk_producer(runner_ids: List[int]) -> Generator[List[int]]:
+def chunk_producer(runner_ids: List[int]) -> Iterator[List[int]]:
     for i in range(0, len(runner_ids), BATCH_SIZE):
         yield runner_ids[i : i + BATCH_SIZE]
 

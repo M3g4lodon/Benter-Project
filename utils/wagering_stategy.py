@@ -7,7 +7,7 @@ import pandas as pd
 import seaborn as sns
 from tqdm import tqdm
 
-from constants import PMU_BETTINGS
+from constants import PMU_BETTINGS, Sources
 from constants import PMU_MINIMUM_BET_SIZE
 from utils import import_data
 from utils.expected_return import get_race_odds
@@ -25,7 +25,7 @@ DEFAULT_BET_SIZE = PMU_MINIMUM_BET_SIZE * 10
 
 def compute_expected_return(
     compute_betting_fun: Callable,
-    source: str,
+    source: Sources,
     code_pari: str,
     winning_model: AbstractWinningModel,
     bet_size: float = DEFAULT_BET_SIZE,
@@ -189,7 +189,7 @@ def plot_expected_return(expected_return_df: pd.DataFrame) -> None:
 
 def compute_scenario(
     compute_betting_fun: Callable,
-    source: str,
+    source: Sources,
     code_pari: str,
     capital_fraction: float,
     winning_model: AbstractWinningModel,

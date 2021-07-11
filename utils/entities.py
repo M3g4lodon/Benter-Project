@@ -2,12 +2,13 @@ import featuretools as ft
 import numpy as np
 import pandas as pd
 
+from constants import Sources
 from utils import import_data
 
 SOURCE = "PMU"
 
 
-def get_entity_set(source: str) -> ft.EntitySet:
+def get_entity_set(source: Sources) -> ft.EntitySet:
     train_races_df = import_data.get_split_date(source=source, on_split="train")
 
     racetrack_columns = ["course_hippodrome", "reunion_pays"]

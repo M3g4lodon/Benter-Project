@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 
 import utils
-from constants import SOURCE_PMU
+from constants import Sources
 from utils.scrape import execute_get_query
 
 
@@ -239,7 +239,7 @@ def get_penetrometer_value(course: dict) -> Optional[float]:
 def get_race_horses_records(
     programme: dict, date: dt.date, r_i: int, c_i: int, should_be_on_disk: bool
 ) -> Optional[List[dict]]:
-    folder_path = utils.get_folder_path(source=SOURCE_PMU, date=date)
+    folder_path = utils.get_folder_path(source=Sources.PMU, date=date)
 
     reunions_ = [
         reunion

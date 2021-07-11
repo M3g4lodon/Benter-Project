@@ -7,10 +7,11 @@ import numpy as np
 import pandas as pd
 from scipy.stats import stats
 
+from constants import Sources
 from utils import import_data
+from utils import preprocess
 from winning_horse_models import AbstractWinningModel
 from winning_horse_models import ModelNotCreatedOnceError
-from winning_horse_models import N_FEATURES
 from winning_horse_models.baselines import RandomModel
 
 
@@ -41,7 +42,7 @@ def kappa_cohen_like(rank_race, rank_hat, k: Optional[int] = None):
 
 
 def compute_validation_error(
-    source: str,
+    source: Sources,
     k: int,
     validation_method: Callable,
     winning_model: AbstractWinningModel,
@@ -50,9 +51,13 @@ def compute_validation_error(
     verbose: bool = False,
 ) -> dict:
     assert k > 0
+    if selected_features_index is None:
+        selected_features_index = list(range(winning_model.n_features))
     assert len(set(selected_features_index)) == len(selected_features_index)
     assert 0 <= min(selected_features_index)
-    assert N_FEATURES > max(selected_features_index)
+    assert preprocess.get_n_preprocessed_feature_columns(source=source) > max(
+        selected_features_index
+    )
     features_index = selected_features_index + ([-1] if extra_features_func else [])
     min_horse, max_horse = import_data.get_min_max_horse(source=source)
     res = {

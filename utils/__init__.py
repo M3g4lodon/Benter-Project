@@ -6,9 +6,7 @@ from typing import Generator
 from typing import Optional
 
 from constants import PMU_DATA_DIR
-from constants import SOURCE_PMU
-from constants import SOURCE_Unibet
-from constants import SOURCES
+from constants import Sources
 from constants import UNIBET_DATA_DIR
 from utils.logger import setup_logger
 
@@ -29,11 +27,10 @@ def load_json(filename: str) -> Optional[dict]:
         return json.load(fp=fp)
 
 
-def get_folder_path(source: str, date: dt.date) -> Optional[str]:
-    assert source in SOURCES
-    if source == SOURCE_PMU:
+def get_folder_path(source: Sources, date: dt.date) -> Optional[str]:
+    if source == Sources.PMU:
         return os.path.join(PMU_DATA_DIR, date.isoformat())
-    if source == SOURCE_Unibet:
+    if source == Sources.UNIBET:
         return os.path.join(UNIBET_DATA_DIR, date.isoformat())
     return None
 

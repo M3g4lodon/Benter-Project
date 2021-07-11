@@ -3,6 +3,7 @@ from typing import Tuple
 import numpy as np
 from sklearn import metrics
 
+from constants import Sources
 from utils import import_data
 from utils import permutations
 from winning_horse_models import AbstractWinningModel
@@ -21,7 +22,7 @@ def _one_hot_encode(y: np.array, n_horses: int) -> np.array:
 # inspiration:
 # - https://www.kaggle.com/yyzz1010/predict-the-winning-horse-100-on-small-test-data
 def train_per_n_horses_races(
-    source: str, winning_model: AbstractWinningModel, verbose: bool = False
+    source: Sources, winning_model: AbstractWinningModel, verbose: bool = False
 ) -> Tuple[AbstractWinningModel, dict]:
     """Train Sklearn-like model on each n_horses-size races.
     Returns trained model and training history"""
@@ -127,7 +128,7 @@ def train_per_n_horses_races(
 
 
 def train_per_n_horses_races_with_permutations(
-    source: str,
+    source: Sources,
     winning_model: AbstractWinningModel,
     n_permuted_races: int,
     verbose: bool = False,

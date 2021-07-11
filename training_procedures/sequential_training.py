@@ -7,14 +7,15 @@ import numpy as np
 import pandas as pd
 
 import winning_validation.errors
+from constants import Sources
 from utils import import_data
 from utils import permutations
+from utils import preprocess
 from winning_horse_models import AbstractWinningModel
-from winning_horse_models import N_FEATURES
 
 
 def train_on_each_horse_with_epochs(
-    source: str,
+    source: Sources,
     winning_model: AbstractWinningModel,
     n_epochs: int,
     selected_features_index: Optional[List[int]] = None,
@@ -23,9 +24,16 @@ def train_on_each_horse_with_epochs(
 ) -> Tuple[AbstractWinningModel, dict]:
     """Train deep learning (tf.keras like) model of each n_horses on n_epochs.
     Returns trained models and training history"""
-    assert len(set(selected_features_index)) == len(selected_features_index)
-    assert min(selected_features_index) >= 0
-    assert N_FEATURES > max(selected_features_index)
+    if selected_features_index is not None:
+        assert len(set(selected_features_index)) == len(selected_features_index)
+        assert min(selected_features_index) >= 0
+        assert preprocess.get_n_preprocessed_feature_columns(source=source) > max(
+            selected_features_index
+        )
+    else:
+        selected_features_index = list(
+            range(preprocess.get_n_preprocessed_feature_columns(source=source))
+        )
     min_horse, max_horse = import_data.get_min_max_horse(source=source)
     training_history = {
         "n_horses_min": min_horse,
@@ -33,6 +41,7 @@ def train_on_each_horse_with_epochs(
         "epochs": {},
         "n_horses": {},
     }
+
     features_index = selected_features_index + ([-1] if extra_features_func else [])
     for epoch in range(n_epochs):
         training_history["epochs"][epoch] = {"n_horses_history": {}}
@@ -79,7 +88,7 @@ def train_on_each_horse_with_epochs(
                     print(f"\nNo val data for {n_horses}")
 
             if x.size == 0:
-                val_loss = winning_model.evaluate(x=x_val, y=y_val)
+                val_loss = winning_model.evaluate(x=x_val, y=y_val)[0]
                 val_loss_per_horse = val_loss / n_horses
                 message = (
                     f"Evaluation only for {n_horses} horses: loss per horse None, "
@@ -139,7 +148,7 @@ def train_on_each_horse_with_epochs(
 
 
 def pretrain_on_each_subraces(
-    source: str,
+    source: Sources,
     winning_model: AbstractWinningModel,
     n_permutations: int,
     verbose: bool = False,
@@ -301,7 +310,7 @@ def pretrain_on_each_subraces(
 
 # TODO test this
 def train_on_all_races(
-    source: str,
+    source: Sources,
     winning_model: AbstractWinningModel,
     n_epochs: int,
     verbose: bool = False,

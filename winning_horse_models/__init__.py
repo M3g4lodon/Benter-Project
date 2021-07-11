@@ -8,10 +8,8 @@ import joblib
 import numpy as np
 
 from constants import SAVED_MODELS_DIR
-from constants import SOURCE_PMU
-from utils import preprocess
+from constants import Sources
 
-N_FEATURES = preprocess.get_n_preprocessed_feature_columns(source=SOURCE_PMU)
 
 # TODO add MLP
 
@@ -20,8 +18,9 @@ class AbstractWinningModel(ABC):
 
     _NotFittedModelError: Optional[Exception] = None
 
-    def __init__(self):
+    def __init__(self, source: Sources):
         assert self._NotFittedModelError is not None
+        self.source = source
         self.n_horses_models = {}
 
     def get_n_horses_model(self, n_horses: int):
@@ -55,7 +54,7 @@ class AbstractWinningModel(ABC):
 
 
 class SequentialMixin:
-    def __init__(self, n_features: int = N_FEATURES):
+    def __init__(self, n_features: Optional[int], **kwargs):
         assert self._NotFittedModelError is not None
         self.n_horses_models = {}
         self.n_features = n_features

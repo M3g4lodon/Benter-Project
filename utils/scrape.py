@@ -38,7 +38,7 @@ def execute_get_query(url: str) -> dict:
     return res
 
 
-def create_day_folder(date: dt.date, source: str) -> None:
+def create_day_folder(date: dt.date, source: Sources) -> None:
     assert source in ["PMU", "UNIBET"]
     data_dir = PMU_DATA_DIR if source == "PMU" else UNIBET_DATA_DIR
     if date.isoformat() in os.listdir(data_dir):

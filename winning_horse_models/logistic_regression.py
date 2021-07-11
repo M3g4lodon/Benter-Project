@@ -1,5 +1,6 @@
 import json
 import os
+from typing import Optional
 
 import numpy as np
 import tensorflow as tf
@@ -7,7 +8,6 @@ import tensorflow as tf
 from constants import SAVED_MODELS_DIR
 from utils import import_data
 from winning_horse_models import AbstractWinningModel
-from winning_horse_models import N_FEATURES
 from winning_horse_models import SequentialMixin
 
 
@@ -42,28 +42,35 @@ class LogisticRegressionModel(SequentialMixin, AbstractWinningModel):
         model.build(input_shape=(None, n_horses, self.n_features))
         return model
 
-    def save_model(self) -> None:
+    def save_model(self, prefix: Optional[str] = None) -> None:
         if self.__class__.__name__ not in os.listdir(SAVED_MODELS_DIR):
             os.mkdir(os.path.join(SAVED_MODELS_DIR, self.__class__.__name__))
         weights, bias = self.shared_layer.get_weights()
-
+        prefix = prefix or ""
         shared_layer = {
             "weights": weights.tolist(),
             "bias": bias.tolist(),
             "config": self.shared_layer.get_config(),
+            "n_features": self.n_features,
         }
         with open(
             os.path.join(
-                SAVED_MODELS_DIR, self.__class__.__name__, "shared_weights.json"
+                SAVED_MODELS_DIR,
+                self.__class__.__name__,
+                f"{prefix}shared_weights.json",
             ),
             "w+",
         ) as fp:
             json.dump(obj=shared_layer, fp=fp)
 
     @classmethod
-    def load_model(cls) -> "LogisticRegressionModel":
+    def load_model(cls, prefix: Optional[str] = None) -> "LogisticRegressionModel":
+        prefix = prefix or ""
         with open(
-            os.path.join(SAVED_MODELS_DIR, cls.__name__, "shared_weights.json"), "r"
+            os.path.join(
+                SAVED_MODELS_DIR, cls.__name__, f"{prefix}shared_weights.json"
+            ),
+            "r",
         ) as fp:
             shared_layer_json = json.load(fp=fp)
         baseline_weights = [
@@ -75,7 +82,7 @@ class LogisticRegressionModel(SequentialMixin, AbstractWinningModel):
         shared_layer.build(input_shape=(len(shared_layer_json["weights"]),))
         shared_layer.set_weights(baseline_weights)
 
-        model = LogisticRegressionModel()
+        model = LogisticRegressionModel(n_features=shared_layer_json["n_features"])
         model.shared_layer = shared_layer
         return model
 
@@ -84,19 +91,18 @@ from joblib import Parallel, delayed
 from scipy import optimize
 
 #### SCRIPT Don't use it
-from constants import SOURCE_PMU
+from constants import Sources
 
 
 def compute_log_likelihood(intercept_weights):
     intercept, weights = intercept_weights[0], intercept_weights[1:]
     weights = np.array(weights)
-    assert len(weights) == N_FEATURES
-    min_horse, max_horse = import_data.get_min_max_horse(source=SOURCE_PMU)
+    min_horse, max_horse = import_data.get_min_max_horse(source=Sources.PMU)
 
     # TODO np.vectorize this function
     def _compute_n_horses_log_likelihood(n_horses):
         x, y, _ = import_data.get_races_per_horse_number(
-            source=SOURCE_PMU,
+            source=Sources.PMU,
             n_horses=n_horses,
             on_split="train",
             x_format="sequential_per_horse",

@@ -14,6 +14,7 @@ from joblib import Memory
 
 from constants import CACHE_DIR
 from constants import DATA_DIR
+from constants import Sources
 
 memory = Memory(location=CACHE_DIR, verbose=0)
 
@@ -21,45 +22,73 @@ ZETURF_BEFORE_TRAIN_DATE = dt.datetime(2012, 11, 1)
 ZETURF_BEFORE_VALIDATION_DATE = dt.datetime(2012, 12, 1)
 
 PMU_BEFORE_TRAIN_DATE = dt.datetime(2018, 1, 1, tzinfo=pytz.UTC)
-PMU_BEFORE_VALIDATION_DATE = dt.datetime(2019, 7, 1, tzinfo=pytz.UTC)
+PMU_BEFORE_VALIDATION_DATE = dt.datetime(2020, 1, 1, tzinfo=pytz.UTC)
+
+UNIBET_BEFORE_TRAIN_DATE = dt.datetime(2018, 1, 1, tzinfo=pytz.UTC)
+UNIBET_BEFORE_VALIDATION_DATE = dt.datetime(2020, 1, 1, tzinfo=pytz.UTC)
 
 MAX_NAN_PROP = 0.5
+MANDATORY_COLUMNS_TYPE_CHECKERS: List[Tuple[str, Callable]] = [
+    ("horse_id", pd.api.types.is_int64_dtype),
+    ("race_id", pd.api.types.is_int64_dtype),
+    ("n_horses", pd.api.types.is_int64_dtype),
+    ("race_datetime", pd.api.types.is_datetime64tz_dtype),
+    ("odds", pd.api.types.is_float_dtype),
+    ("horse_place", pd.api.types.is_float_dtype),
+]
 
 
 @functools.lru_cache(maxsize=None)
-def load_featured_data(source: str) -> pd.DataFrame:
+def load_featured_data(source: Sources) -> pd.DataFrame:
     """Load stored CSV of horse/races for the given source"""
-    assert source in ["ZETURF", "PMU"]
 
-    if source == "ZETURF":
+    if source == Sources.ZETURF:
         race_horse_df = pd.read_csv(
             os.path.join(DATA_DIR, "2012_data_with_features.csv")
         )
 
-    else:
+    elif source == Sources.UNIBET:
+        race_horse_df = pd.read_parquet(
+            os.path.join(DATA_DIR, "unibet_data_with_features.parquet")
+        )
+    elif source == Sources.PMU:
         race_horse_df = pd.read_csv(
             os.path.join(DATA_DIR, "pmu_data_with_features.csv")
         )
+        race_horse_df["race_datetime"] = pd.to_datetime(race_horse_df["race_datetime"])
+        race_horse_df["duration_since_last_race"] = pd.to_timedelta(
+            race_horse_df["duration_since_last_race"]
+        )
+    else:
+        raise Exception("Unknown data source")
 
-    race_horse_df["race_datetime"] = pd.to_datetime(race_horse_df["race_datetime"])
-    race_horse_df["duration_since_last_race"] = pd.to_timedelta(
-        race_horse_df["duration_since_last_race"]
-    )
+    assert set(race_horse_df.columns).issuperset(
+        {col_name for col_name, _ in MANDATORY_COLUMNS_TYPE_CHECKERS}
+    ), f"Missing { {col_name for col_name, _ in MANDATORY_COLUMNS_TYPE_CHECKERS}.difference(set(race_horse_df.columns))}"
 
+    for col_name, type_checker in MANDATORY_COLUMNS_TYPE_CHECKERS:
+        if not type_checker(race_horse_df[col_name]):
+            raise ValueError(
+                f"Wrong type on column {col_name}, found {race_horse_df[col_name].dtype}"
+            )
     return race_horse_df
 
 
 def get_splitted_featured_data(
-    source: str,
+    source: Sources,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Train/Validation/Test Split the Horse/Races of a given source"""
     race_horse_df = load_featured_data(source=source)
-    if source == "ZETURF":
+    if source == Sources.ZETURF:
         before_train_date, before_validation_date = (
             ZETURF_BEFORE_TRAIN_DATE,
             ZETURF_BEFORE_VALIDATION_DATE,
         )
-
+    elif source == Sources.UNIBET:
+        before_train_date, before_validation_date = (
+            UNIBET_BEFORE_TRAIN_DATE,
+            UNIBET_BEFORE_VALIDATION_DATE,
+        )
     else:
 
         before_train_date, before_validation_date = (
@@ -67,13 +96,15 @@ def get_splitted_featured_data(
             PMU_BEFORE_VALIDATION_DATE,
         )
 
-    train_race_horse_df = race_horse_df[race_horse_df.race_datetime < before_train_date]
+    train_race_horse_df = race_horse_df[
+        race_horse_df["race_datetime"] < before_train_date
+    ]
     val_race_horse_df = race_horse_df[
-        (race_horse_df.race_datetime >= before_train_date)
-        & (race_horse_df.race_datetime < before_validation_date)
+        (race_horse_df["race_datetime"] >= before_train_date)
+        & (race_horse_df["race_datetime"] < before_validation_date)
     ]
     test_race_horse_df = race_horse_df[
-        race_horse_df.race_datetime >= before_validation_date
+        race_horse_df["race_datetime"] >= before_validation_date
     ]
     assert len(race_horse_df) == len(train_race_horse_df) + len(
         val_race_horse_df
@@ -82,7 +113,7 @@ def get_splitted_featured_data(
     return train_race_horse_df, val_race_horse_df, test_race_horse_df
 
 
-def get_split_date(source: str, on_split: str) -> pd.DataFrame:
+def get_split_date(source: Sources, on_split: str) -> pd.DataFrame:
     (
         train_race_horse_df,
         val_race_horse_df,
@@ -102,7 +133,7 @@ def extract_x_y(  # pylint:disable=too-many-branches
     race_df: pd.DataFrame,
     x_format: str,
     y_format: str,
-    source: str,
+    source: Sources,
     ignore_y: bool = False,
 ) -> Tuple[Optional[np.array], Optional[np.array]]:
     """For a given race in `race_df` returns features, y in the asked format and odds"""
@@ -155,7 +186,7 @@ def extract_x_y(  # pylint:disable=too-many-branches
 
 @memory.cache
 def _get_races_per_horse_number(
-    source: str,
+    source: Sources,
     n_horses: int,
     on_split: str,
     y_format: str,
@@ -171,7 +202,7 @@ def _get_races_per_horse_number(
     y = []
     race_dfs = []
     for _, race_df in rh_df[rh_df["n_horses"] == n_horses].groupby("race_id"):
-        if source == "PMU":
+        if source == Sources.PMU:
             race_df = race_df[race_df["statut"] == "PARTANT"]
         assert len(race_df) == n_horses
 
@@ -199,7 +230,7 @@ def _get_races_per_horse_number(
 
 
 def get_races_per_horse_number(
-    source: str,
+    source: Sources,
     n_horses: int,
     on_split: str,
     x_format: str,
@@ -237,7 +268,7 @@ def get_races_per_horse_number(
 
 @memory.cache
 def get_dataset_races(
-    source: str,
+    source: Sources,
     on_split: str,
     x_format: str,
     y_format: str,
@@ -268,7 +299,7 @@ def get_dataset_races(
 
 
 @memory.cache
-def get_min_max_horse(source: str) -> Tuple[int, int]:
+def get_min_max_horse(source: Sources) -> Tuple[int, int]:
     race_horse_df = load_featured_data(source=source)
     count_per_n_horses = race_horse_df.groupby("race_id")["horse_id"].count()
     max_n_horses = count_per_n_horses.max()
@@ -278,7 +309,7 @@ def get_min_max_horse(source: str) -> Tuple[int, int]:
 
 @memory.cache
 def get_n_races(
-    source: str, on_split: str, remove_nan_previous_stakes: bool = False
+    source: Sources, on_split: str, remove_nan_previous_stakes: bool = False
 ) -> int:
     rh_df = get_split_date(source=source, on_split=on_split)
     if remove_nan_previous_stakes:
@@ -291,8 +322,8 @@ def get_n_races(
 
 
 def run():
-    for source in ["PMU", "ZETURF"]:
-        print(f"Looking at data from source {source}")
+    for source in Sources:
+        print(f"Looking at data from source {source.name}")
         race_horse_df = load_featured_data(source=source)
 
         n_races = race_horse_df["race_id"].nunique()

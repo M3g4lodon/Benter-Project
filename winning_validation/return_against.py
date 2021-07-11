@@ -46,7 +46,7 @@ def get_rectified_pari_mutual_probabilities(previous_stakes: np.array):
 
 
 def compute_return_against_odds(
-    source: str,
+    source: Sources,
     same_races_support: bool,
     winning_model: AbstractWinningModel,
     selected_features_index: Optional[List[int]] = None,

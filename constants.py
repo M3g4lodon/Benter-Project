@@ -7,17 +7,17 @@ from typing import Optional
 TIMEZONE = "Europe/Paris"
 
 
-SOURCE_PMU = "PMU"
-SOURCE_Unibet = "Unibet"
-SOURCE_ZeTurf = "ZeTurf"
+class Sources(Enum):
+    PMU = "PMU"
+    UNIBET = "Unibet"
+    ZETURF = "ZeTurf"
 
-SOURCES = [SOURCE_PMU, SOURCE_Unibet, SOURCE_ZeTurf]
 
 DATA_DIR = "./data"
 CACHE_DIR = "./cache"
 SAVED_MODELS_DIR = "./saved_models"
-PMU_DATA_DIR = os.path.join(DATA_DIR, SOURCE_PMU)
-UNIBET_DATA_DIR = os.path.join(DATA_DIR, SOURCE_Unibet)
+PMU_DATA_DIR = os.path.join(DATA_DIR, Sources.PMU.value)
+UNIBET_DATA_DIR = os.path.join(DATA_DIR, Sources.UNIBET.value)
 
 
 PMU_INCIDENT_TYPES = {

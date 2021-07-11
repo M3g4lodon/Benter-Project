@@ -7,6 +7,7 @@ from typing import Union
 import numpy as np
 import pandas as pd
 
+from constants import Sources
 from utils import import_data
 from winning_horse_models import AbstractWinningModel
 from winning_horse_models import N_FEATURES
@@ -41,7 +42,7 @@ def compute_rank_proba(rank_race: np.array, k: int, proba_distribution: np.array
 
 def compute_predicted_proba_on_actual_races(
     k: int,
-    source: str,
+    source: Sources,
     same_races_support: bool,
     winning_model: AbstractWinningModel,
     selected_features_index: Optional[List[int]] = None,
@@ -171,7 +172,7 @@ def compute_predicted_proba_on_actual_races(
 
 # McFadden's pseudo-R squared
 def compute_mcfadden_r_squared(
-    source: str,
+    source: Sources,
     winning_model: AbstractWinningModel,
     selected_features_index: Optional[List[int]] = None,
     extra_features_func: Optional[Callable[[pd.DataFrame], pd.DataFrame]] = None,

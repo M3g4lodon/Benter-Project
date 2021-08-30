@@ -3,6 +3,7 @@ import os
 from typing import Iterator
 from typing import List
 
+import dask.dataframe as dd
 import numpy as np
 import pandas as pd
 from joblib import delayed
@@ -22,6 +23,17 @@ N_RETRY = 2
 
 logger = setup_logger(__name__)
 
+# TODO features on comment (NLP)
+# TODO features on pronostic (NLP)
+# TODO features on conditions (NLP)
+# TODO features on owner (has_person, has_organisation)
+# TODO n_days_since_last_days
+# TODO time features on months (season)
+# TODO features on lat long
+# TODO horse_previous_speed
+# TODO horse_median_speed
+# TODO horse_has_already_run_in_racetrack
+
 
 def get_feature_for_runners(runner_ids: List[int], db_session) -> pd.DataFrame:
 
@@ -35,6 +47,18 @@ def get_feature_for_runners(runner_ids: List[int], db_session) -> pd.DataFrame:
     r.music,
     r.final_odds as odds,
     r.position as horse_place,
+    r.weight,
+    r.rope_n,
+    r.blinkers,
+    r.shoes,
+    r.stakes,
+    r.sex,
+    r.age,
+    r.team !=0 as is_in_team,
+    r.coat,
+    races.distance,
+    races.stake,
+    races.type,
     runners_with_history.n_horse_previous_races,
     runners_with_history.n_horse_previous_positions,
     runners_with_history.average_horse_position,
@@ -88,6 +112,18 @@ where
             "music",
             "odds",
             "horse_place",
+            "weight",
+            "rope_n",
+            "blinkers",
+            "shoes",
+            "horse_stakes",
+            "sex",
+            "age",
+            "is_in_team",
+            "coat",
+            "race_distance",
+            "race_stake",
+            "race_type",
             "n_horse_previous_races",
             "n_horse_previous_positions",
             "average_horse_position",
@@ -151,6 +187,28 @@ where
         )
         df_feature_sub.set_index("runner_id", inplace=True)
         df_features = df_features.join(df_feature_sub, on="runner_id")
+
+    query = f"""
+    select
+        r.id,
+        horse_shows.ground,
+        race_tracks.country_name
+    from
+        runners r
+    join races on
+        races.id = r.race_id
+    join horse_shows on
+        horse_shows.id = races.horse_show_id
+    join race_tracks on
+        race_tracks.id = horse_shows.race_track_id
+        """
+    df_feature_sub = pd.DataFrame(
+        db_session.execute(query).fetchall(),
+        columns=["runner_id", "horse_show_ground", "race_track_country"],
+    )
+    df_feature_sub.set_index("runner_id", inplace=True)
+    df_features = df_features.join(df_feature_sub, on="runner_id")
+
     df_features.fillna(value=np.nan, inplace=True)
     df_features["race_date"] = pd.to_datetime(df_features["race_date"])
     df_features["horse_place"] = pd.to_numeric(
@@ -230,19 +288,27 @@ def compute_feature_on_chunk(runner_ids: List[int]) -> pd.DataFrame:
     return df_features_batch
 
 
-def try_hard_compute_feature_on_chunk(runner_ids: List[int]) -> pd.DataFrame:
+def try_hard_compute_feature_on_chunk(runner_ids: List[int]) -> int:
+    first_runner_id = runner_ids[0]
+    file_path = f"./data/unibet_cache/chunk_first_runner_id_{first_runner_id}.csv"
+    if os.path.exists(file_path):
+        return first_runner_id
     try:
-        return compute_feature_on_chunk(runner_ids=runner_ids)
+        res = compute_feature_on_chunk(runner_ids=runner_ids)
+        res.to_csv(file_path)
+        return first_runner_id
     except Exception as e:
-        logger.warning("%s exception occured, retrying once", e)
-        return compute_feature_on_chunk(runner_ids=runner_ids)
+        logger.warning("%s exception occurred, retrying once", e)
+        res = compute_feature_on_chunk(runner_ids=runner_ids)
+        res.to_csv(file_path)
+        return first_runner_id
 
 
 def get_dataset_races() -> pd.DataFrame:
     with create_sqlalchemy_session() as db_session:
         runner_ids = _get_all_runner_ids(db_session=db_session)
 
-    df_features_batches = Parallel(n_jobs=n_parallel_jobs, verbose=1)(
+    first_runner_ids = Parallel(n_jobs=n_parallel_jobs, verbose=1)(
         delayed(try_hard_compute_feature_on_chunk)(chunk)
         for chunk in tqdm(
             chunk_producer(runner_ids),
@@ -252,7 +318,14 @@ def get_dataset_races() -> pd.DataFrame:
         )
     )
 
-    return pd.concat(df_features_batches)
+    for runner_ids in chunk_producer(runner_ids):
+        first_runner_id = runner_ids[0]
+        assert first_runner_id in first_runner_ids
+        file_path = f"./data/unibet_cache/chunk_first_runner_id_{first_runner_id}.csv"
+        assert os.path.exists(file_path)
+    return dd.read_csv(
+        "./data/unibet_cache/chunk_first_runner_id_*.csv", assume_missing=True
+    )
 
 
 if __name__ == "__main__":

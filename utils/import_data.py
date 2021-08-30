@@ -6,7 +6,9 @@ from typing import Callable
 from typing import List
 from typing import Optional
 from typing import Tuple
+from typing import Union
 
+import dask.dataframe as dd
 import numpy as np
 import pandas as pd
 import pytz
@@ -15,6 +17,7 @@ from joblib import Memory
 from constants import CACHE_DIR
 from constants import DATA_DIR
 from constants import Sources
+from constants import TIMEZONE
 
 memory = Memory(location=CACHE_DIR, verbose=0)
 
@@ -39,7 +42,7 @@ MANDATORY_COLUMNS_TYPE_CHECKERS: List[Tuple[str, Callable]] = [
 
 
 @functools.lru_cache(maxsize=None)
-def load_featured_data(source: Sources) -> pd.DataFrame:
+def load_featured_data(source: Sources) -> Union[pd.DataFrame, dd.DataFrame]:
     """Load stored CSV of horse/races for the given source"""
 
     if source == Sources.ZETURF:
@@ -48,9 +51,17 @@ def load_featured_data(source: Sources) -> pd.DataFrame:
         )
 
     elif source == Sources.UNIBET:
-        race_horse_df = pd.read_parquet(
+        race_horse_df = dd.read_parquet(
             os.path.join(DATA_DIR, "unibet_data_with_features.parquet")
         )
+        for col in ("horse_id", "race_id", "n_horses"):
+            race_horse_df[col] = race_horse_df[col].astype(np.int64)
+        for col in ("race_date", "race_datetime"):
+            race_horse_df[col] = race_horse_df[col].astype("M")
+            race_horse_df[col] = race_horse_df[col].dt.tz_localize(
+                TIMEZONE, ambiguous="NaT", nonexistent="NaT"
+            )
+        race_horse_df = race_horse_df.compute()
     elif source == Sources.PMU:
         race_horse_df = pd.read_csv(
             os.path.join(DATA_DIR, "pmu_data_with_features.csv")
@@ -106,7 +117,8 @@ def get_splitted_featured_data(
     test_race_horse_df = race_horse_df[
         race_horse_df["race_datetime"] >= before_validation_date
     ]
-    assert len(race_horse_df) == len(train_race_horse_df) + len(
+    # Because of NaT
+    assert len(race_horse_df) >= len(train_race_horse_df) + len(
         val_race_horse_df
     ) + len(test_race_horse_df)
 
@@ -254,7 +266,7 @@ def get_races_per_horse_number(
         y_format=y_format,
         remove_nan_odds=remove_nan_odds,
     )
-    if x_format == "flattened":
+    if x_format == "flattened" and x.size != 0:
         x = np.reshape(a=x, newshape=(x.shape[0], x.shape[1] * x.shape[2]), order="F")
 
     if extra_features_func is not None and x.size != 0:

@@ -1,3 +1,4 @@
+from typing import List
 from typing import Tuple
 
 import numpy as np
@@ -17,6 +18,22 @@ def _one_hot_encode(y: np.array, n_horses: int) -> np.array:
     one_hot_encoded_y = np.zeros((y.size, n_horses))
     one_hot_encoded_y[np.arange(y.size), y.astype(np.int)] = 1
     return one_hot_encoded_y
+
+
+def _extend_y_pred_with_unseen_classes(
+    missing_indexes: List[int], y_pred: np.ndarray
+) -> np.ndarray:
+    # Some label classes might not be seen by model, and therefore be missing
+    for missing_index in sorted(missing_indexes):
+        y_pred = np.concatenate(
+            [
+                y_pred[:, :missing_index],
+                np.zeros(y_pred.shape[0]).reshape((y_pred.shape[0], 1)),
+                y_pred[:, missing_index:],
+            ],
+            axis=1,
+        )
+    return y_pred
 
 
 # inspiration:
@@ -80,6 +97,11 @@ def train_per_n_horses_races(
 
         if verbose:
             y_pred = model.predict_proba(x)
+            y_pred = _extend_y_pred_with_unseen_classes(
+                missing_indexes=[i for i in range(n_horses) if i not in model.classes_],
+                y_pred=y_pred,
+            )
+
             y_true = _one_hot_encode(y, n_horses=n_horses)
             if np.any(np.isnan(y_pred)):
                 print(
@@ -96,6 +118,12 @@ def train_per_n_horses_races(
 
             else:
                 y_pred = model.predict_proba(x_val)
+                y_pred = _extend_y_pred_with_unseen_classes(
+                    missing_indexes=[
+                        i for i in range(n_horses) if i not in model.classes_
+                    ],
+                    y_pred=y_pred,
+                )
                 y_true = _one_hot_encode(y_val, n_horses=n_horses)
                 if np.any(np.isnan(y_pred)):
                     print(

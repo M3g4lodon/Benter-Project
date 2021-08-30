@@ -10,7 +10,6 @@ import pandas as pd
 from constants import Sources
 from utils import import_data
 from winning_horse_models import AbstractWinningModel
-from winning_horse_models import N_FEATURES
 from winning_horse_models.baselines import RandomModel
 
 
@@ -50,9 +49,10 @@ def compute_predicted_proba_on_actual_races(
     verbose: bool = False,
 ) -> dict:
     assert k > 0
+    if selected_features_index is None:
+        selected_features_index = list(range(winning_model.n_features))
     assert len(set(selected_features_index)) == len(selected_features_index)
     assert 0 <= min(selected_features_index)
-    assert N_FEATURES > max(selected_features_index)
 
     features_index = selected_features_index + ([-1] if extra_features_func else [])
 

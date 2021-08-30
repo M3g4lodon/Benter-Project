@@ -81,7 +81,17 @@ class SequentialMixin:
 
 
 class FlattenMixin:
-    # TODO add flatten x for fit
+    def fit(self, x: np.array, y: np.array, **kwargs):
+        model = self.get_n_horses_model(n_horses=x.shape[1])
+
+        return model.fit(
+            x=np.reshape(
+                a=x, newshape=(x.shape[0], x.shape[1] * x.shape[2]), order="F"
+            ),
+            y=y,
+            **kwargs,
+        )
+
     def predict(self, x: np.array, **kwargs):
         model = self.get_n_horses_model(n_horses=x.shape[1])
         try:
@@ -98,7 +108,8 @@ class FlattenMixin:
 
 
 class JoblibPicklerMixin:
-    def save_model(self) -> None:
+    def save_model(self, prefix: Optional[str] = None) -> None:
+        prefix = prefix or ""
         if self.__class__.__name__ not in os.listdir(SAVED_MODELS_DIR):
             os.mkdir(os.path.join(SAVED_MODELS_DIR, self.__class__.__name__))
         for n_horse, n_horse_model in self.n_horses_models.items():
@@ -107,17 +118,18 @@ class JoblibPicklerMixin:
                 os.path.join(
                     SAVED_MODELS_DIR,
                     self.__class__.__name__,
-                    f"{self.__class__.__name__}_{n_horse}.pickle",
+                    f"{prefix}{self.__class__.__name__}_{n_horse}.pickle",
                 ),
             )
 
     @classmethod
-    def load_model(cls):
+    def load_model(cls, prefix: Optional[str] = None):
+        prefix = prefix or ""
         model = cls()
         assert cls.__name__ in os.listdir(SAVED_MODELS_DIR)
         for filename in os.listdir(os.path.join(SAVED_MODELS_DIR, cls.__name__)):
             if filename.startswith(cls.__name__):
-                match = re.match(fr"{cls.__name__}_(\d*)\.pickle", filename)
+                match = re.match(fr"{prefix}{cls.__name__}_(\d*)\.pickle", filename)
                 if not match:
                     continue
 

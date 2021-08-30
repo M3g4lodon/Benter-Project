@@ -5,7 +5,7 @@ from tqdm import tqdm
 
 import utils
 from constants import PMU_MIN_DATE
-from constants import SOURCE_PMU
+from constants import Sources
 from utils.pmu_api_data import get_pmu_api_url
 from utils.scrape import check_query_json
 from utils.scrape import create_day_folder
@@ -14,7 +14,7 @@ from utils.scrape import execute_get_query
 
 def download_day_races(date: dt.date, replace_if_exists: bool = True) -> int:
     query_count = 0
-    day_folder_path = utils.get_folder_path(source=SOURCE_PMU, date=date)
+    day_folder_path = utils.get_folder_path(source=Sources.PMU, date=date)
     assert day_folder_path
     filename = os.path.join(day_folder_path, f'{"PROGRAMME".lower()}.json')
     url = get_pmu_api_url(url_name="PROGRAMME", date=date)
@@ -94,7 +94,7 @@ def download_day_races(date: dt.date, replace_if_exists: bool = True) -> int:
 
 
 def run():
-    current_date = dt.date(2021, 4, 1)
+    current_date = dt.date(2021, 5, 21)
     today = dt.date.today()
 
     print(
@@ -103,7 +103,7 @@ def run():
 
     query_count = 0
     while current_date < today:
-        create_day_folder(date=current_date, source="PMU")
+        create_day_folder(date=current_date, source=Sources.PMU)
         query_count += download_day_races(date=current_date, replace_if_exists=False)
         current_date += dt.timedelta(days=1)
 

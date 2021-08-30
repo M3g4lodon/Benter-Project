@@ -74,7 +74,7 @@ def download_day_races(date: dt.date, replace_if_exists: bool = True) -> int:
 
 
 def run():
-    current_date = dt.date(2021, 4, 1)
+    current_date = dt.date(2021, 5, 21)
     today = dt.date.today()
 
     print(

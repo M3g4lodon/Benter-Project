@@ -1,16 +1,22 @@
 import os
 import re
+from typing import Optional
 
 import numpy as np
+from sklearn.exceptions import NotFittedError
 from xgboost import XGBClassifier
 from xgboost.core import XGBoostError
 
 from constants import SAVED_MODELS_DIR
+from constants import Sources
 from winning_horse_models import AbstractWinningModel
+from winning_horse_models import FlattenMixin
 from winning_horse_models import ModelNotCreatedOnceError
 
 
-class XGBoostWinningModel(AbstractWinningModel):
+class XGBoostWinningModel(FlattenMixin, AbstractWinningModel):
+
+    # TODO(mathieu) Add n_features as attributes
     _NotFittedModelError = XGBoostError
 
     def _create_n_horses_model(self, n_horses: int):
@@ -27,7 +33,7 @@ class XGBoostWinningModel(AbstractWinningModel):
         except self._NotFittedModelError:
             raise ModelNotCreatedOnceError
 
-    def save_model(self) -> None:
+    def save_model(self, prefix: Optional[str] = None) -> None:
         if self.__class__.__name__ not in os.listdir(SAVED_MODELS_DIR):
             os.mkdir(os.path.join(SAVED_MODELS_DIR, self.__class__.__name__))
         for n_horse, n_horse_model in self.n_horses_models.items():
@@ -36,19 +42,23 @@ class XGBoostWinningModel(AbstractWinningModel):
                     fname=os.path.join(
                         SAVED_MODELS_DIR,
                         self.__class__.__name__,
-                        f"{self.__class__.__name__}_{n_horse}.json",
+                        f"{prefix}{self.__class__.__name__}_{n_horse}.pickle",
                     )
                 )
             except XGBoostError as e:
                 print(f"Could not save model for {n_horse} horses: {e}")
+            except NotFittedError as e:
+                print(f"Could not save model for {n_horse} horses: {e}")
 
     @classmethod
-    def load_model(cls) -> "XGBoostWinningModel":
-        model = XGBoostWinningModel()
+    def load_model(
+        cls, source: Sources, prefix: Optional[str] = None
+    ) -> "XGBoostWinningModel":
+        model = XGBoostWinningModel(source=source)
         assert cls.__name__ in os.listdir(SAVED_MODELS_DIR)
         for filename in os.listdir(os.path.join(SAVED_MODELS_DIR, cls.__name__)):
-            if filename.startswith(cls.__name__):
-                match = re.match(fr"{cls.__name__}_(\d*)\.json", filename)
+            if filename.startswith(f"{prefix}{cls.__name__}"):
+                match = re.match(fr"{prefix}{cls.__name__}_(\d*)\.json", filename)
                 if not match:
                     continue
                 n_horse = int(match.group(1))
@@ -58,3 +68,6 @@ class XGBoostWinningModel(AbstractWinningModel):
                 )
                 assert model.n_horses_models[n_horse] is not None
         return model
+
+
+NotFittedError

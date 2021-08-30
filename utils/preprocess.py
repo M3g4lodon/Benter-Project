@@ -14,6 +14,7 @@ from utils import import_data
 
 memory = Memory(location=CACHE_DIR, verbose=0)
 
+
 FEATURE_COLUMNS: Dict[Sources, List[str]] = {
     Sources.PMU: [
         "is_pregnant",
@@ -67,20 +68,23 @@ FEATURE_COLUMNS: Dict[Sources, List[str]] = {
         "average_owner_top_3",
         "mean_horse_place",
         "average_horse_top_1_y",
-    ],
-}
-TO_ONE_HOT_ENCODE_COLUMNS: Dict[Sources, List[str]] = {
-    Sources.PMU: [
-        "allure",
-        "course_discipline",
-        "course_condition_sexe",
+        "weight",
+        "rope_n",
         "blinkers",
-        "course_track_type",
-        "horse_sex",
+        "shoes",
+        "horse_stakes",
+        "n_horses",
+        "sex",
+        "age",
+        "is_in_team",
+        "coat",
+        "race_distance",
+        "race_stake",
+        "race_type",
+        "horse_show_ground",
+        "race_track_country",
     ],
-    Sources.UNIBET: [],
 }
-
 IF_NAN_IMPUTE_COLUMNS: Dict[Sources, Dict[str, Union[str, float]]] = {
     Sources.PMU: {"handicap_distance": 0, "handicap_weight": 0, "handicap_value": 0},
     Sources.UNIBET: {
@@ -105,7 +109,90 @@ IF_NAN_IMPUTE_COLUMNS: Dict[Sources, Dict[str, Union[str, float]]] = {
         "average_owner_top_3": "mean",
         "mean_horse_place": "mean",
         "average_horse_top_1_y": "mean",
+        "weight": 0,
+        "race_distance": "mean",
+        "horse_show_ground": "STANDART",
     },
+}
+TO_LABEL_ENCODE_COLUMNS: Dict[Sources, dict] = {
+    Sources.PMU: [],
+    Sources.UNIBET: {
+        "horse_show_ground": {
+            "UNKNOWN": -1,
+            "VERY_HEAVY": 0,
+            "VERY_LOOSE": 0,
+            "SLOW": 0,
+            "STICKY": 0,
+            "HEAVY": 0,
+            "LOOSE": 1,
+            "LIGHT": 1,
+            "GOOD_LIGHT": 2,
+            "GOOD": 2,
+            "GOOD_LOOSE": 2,
+            "STANDART": 2,
+            "FAST": 3,
+            "DRY": 3,
+            "VERY_FAST": 3,
+        },
+        "race_track_country": {
+            "FRANCE": "EUROPE",
+            "SUÈDE": "EUROPE",
+            "ROYAUME-UNI": "EUROPE",
+            "BELGIQUE": "EUROPE",
+            "ESPAGNE": "EUROPE",
+            "ÉMIRATS ARABES UNIS": "MIDDLE_EAST",
+            "AFRIQUE DU SUD": "AFRICA",
+            "PAYS-BAS": "EUROPE",
+            "SINGAPOUR": "ASIA",
+            "URUGUAY": "SOUTH_AMERICA",
+            "ARGENTINE": "SOUTH_AMERICA",
+            "ALLEMAGNE": "EUROPE",
+            "IRLANDE": "EUROPE",
+            "CHILI": "SOUTH_AMERICA",
+            "AUSTRALIE": "OCEANIA",
+            "SUISSE": "EUROPE",
+            "FINLANDE": "EUROPE",
+            "ITALIE": "EUROPE",
+            "R.A.S. CHINOISE DE HONG KONG": "ASIA",
+            "NOUVELLE-ZÉLANDE": "OCEANIA",
+            "ÉTATS-UNIS": "NORTH AMERICA",
+            "NORVÈGE": "EUROPE",
+            "MAROC": "AFRICA",
+            "DANEMARK": "EUROPE",
+            "TURQUIE": "EUROPE",
+            "AUTRICHE": "EUROPE",
+            "JAPON": "ASIA",
+            "CANADA": "NORTH AMERICA",
+            "MAURICE": "ASIA",
+            "MALTE": "EUROPE",
+            "CORÉE DU SUD": "ASIA",
+            "QATAR": "MIDDLE_EAST",
+            "MARTINIQUE": "EUROPE",
+            "TCHÉQUIE": "EUROPE",
+            "PÉROU": "SOUTH_AMERICA",
+            "NOUVELLE-CALÉDONIE": "EUROPE",
+            "BRÉSIL": "SOUTH_AMERICA",
+            "R.A.S. CHINOISE DE MACAO": "ASIA",
+        },
+    },
+}
+TO_ONE_HOT_ENCODE_COLUMNS: Dict[Sources, List[str]] = {
+    Sources.PMU: [
+        "allure",
+        "course_discipline",
+        "course_condition_sexe",
+        "blinkers",
+        "course_track_type",
+        "horse_sex",
+    ],
+    Sources.UNIBET: [
+        "blinkers",
+        "shoes",
+        "sex",
+        "coat",
+        "race_type",
+        "race_track_country",
+    ],
 }
 
 NUMERICAL_FEATURES: Dict[Sources, List[str]] = {
@@ -140,6 +227,10 @@ NUMERICAL_FEATURES: Dict[Sources, List[str]] = {
         "average_owner_top_3",
         "mean_horse_place",
         "average_horse_top_1_y",
+        "weight",
+        "n_horses",
+        "age",
+        "race_distance",
     ],
 }
 
@@ -159,6 +250,15 @@ LOG_NUMERICAL_FEATURES: Dict[Sources, List[str]] = {
         "n_trainer_previous_positions",
         "n_owner_previous_races",
         "n_owner_previous_positions",
+        "horse_stakes",
+        "race_stake",
+    ],
+}
+
+CUSTOM_COLUMNS: Dict[Sources, List[str]] = {
+    Sources.PMU: [],
+    Sources.UNIBET: [
+        "rope_n",  # To normalize by number of n_horses
     ],
 }
 
@@ -167,10 +267,19 @@ def _check_features():
     for source in (Sources.UNIBET, Sources.PMU):
         assert set(FEATURE_COLUMNS[source]).issuperset(
             set(TO_ONE_HOT_ENCODE_COLUMNS[source])
-        )
+        ), set(TO_ONE_HOT_ENCODE_COLUMNS[source]).difference(FEATURE_COLUMNS[source])
+        assert set(FEATURE_COLUMNS[source]).issuperset(
+            set(NUMERICAL_FEATURES[source])
+        ), set(NUMERICAL_FEATURES[source]).difference(FEATURE_COLUMNS[source])
+        assert set(FEATURE_COLUMNS[source]).issuperset(
+            set(LOG_NUMERICAL_FEATURES[source])
+        ), set(LOG_NUMERICAL_FEATURES[source]).difference(FEATURE_COLUMNS[source])
         assert set(FEATURE_COLUMNS[source]).issuperset(
             set(IF_NAN_IMPUTE_COLUMNS[source].keys())
-        )
+        ), set(IF_NAN_IMPUTE_COLUMNS[source].keys()).difference(FEATURE_COLUMNS[source])
+        assert set(FEATURE_COLUMNS[source]).issuperset(
+            set(CUSTOM_COLUMNS[source])
+        ), set(CUSTOM_COLUMNS[source]).difference(FEATURE_COLUMNS[source])
         assert not set(IF_NAN_IMPUTE_COLUMNS[source].keys()).intersection(
             set(TO_ONE_HOT_ENCODE_COLUMNS[source])
         )
@@ -182,6 +291,7 @@ def _check_features():
                 )
 
 
+# TODO to put in tests
 _check_features()
 
 
@@ -234,7 +344,16 @@ def get_n_preprocessed_feature_columns(source: Sources) -> int:
 def preprocess(race_horse_df: pd.DataFrame, source: Sources) -> pd.DataFrame:
     features_df = race_horse_df[FEATURE_COLUMNS[source]]
     standard_scaler_parameters, ohe_features_values = load_preprocess(source=source)
+    for feature_name in CUSTOM_COLUMNS[source]:
+        if feature_name == "rope_n" and source == Sources.UNIBET:
+            features_df["rope_n"] = features_df["rope_n"] / features_df["n_horses"]
+            features_df["rope_n"] = (
+                features_df["rope_n"] - features_df["rope_n"].mean()
+            ) / features_df["rope_n"].std()
+            features_df["rope_n"] = features_df["rope_n"].fillna(0)
+            continue
 
+        raise ValueError(f"Unknown feature {feature_name} to custom encode")
     for feature_col, feature_value in IF_NAN_IMPUTE_COLUMNS[source].items():
         if isinstance(feature_value, float) or isinstance(feature_value, int):
             features_df[feature_col] = features_df[feature_col].fillna(feature_value)
@@ -244,7 +363,9 @@ def preprocess(race_horse_df: pd.DataFrame, source: Sources) -> pd.DataFrame:
                 standard_scaler_parameters[feature_col]["mean"]
             )
             continue
-
+        if feature_value == "STANDART" and feature_col == "horse_show_ground":
+            features_df[feature_col] = features_df[feature_col].fillna(feature_value)
+            continue
         raise ValueError(
             f"Unknown imputation value {feature_value} for feature {feature_col}"
         )
@@ -261,6 +382,9 @@ def preprocess(race_horse_df: pd.DataFrame, source: Sources) -> pd.DataFrame:
             - standard_scaler_parameters[f"log_{numerical_feature}"]["mean"]
         ) / standard_scaler_parameters[f"log_{numerical_feature}"]["std"]
         features_df[numerical_feature].fillna(0, inplace=True)
+
+    for label_feature, label_mapping in TO_LABEL_ENCODE_COLUMNS[source].items():
+        features_df[label_feature] = features_df[label_feature].map(label_mapping)
 
     for ohe_feature in TO_ONE_HOT_ENCODE_COLUMNS[source]:
         for value in ohe_features_values[ohe_feature]:

@@ -5,6 +5,7 @@ import numpy as np
 from sklearn import metrics
 
 from constants import Sources
+from constants import SplitSets
 from utils import import_data
 from utils import permutations
 from winning_horse_models import AbstractWinningModel
@@ -53,14 +54,14 @@ def train_per_n_horses_races(
         x, y, _ = import_data.get_races_per_horse_number(
             source=source,
             n_horses=n_horses,
-            on_split="train",
+            on_split=SplitSets.TRAIN,
             x_format="flattened",
             y_format="index_first",
         )
         x_val, y_val, _ = import_data.get_races_per_horse_number(
             source=source,
             n_horses=n_horses,
-            on_split="val",
+            on_split=SplitSets.VAL,
             x_format="flattened",
             y_format="index_first",
         )
@@ -175,14 +176,14 @@ def train_per_n_horses_races_with_permutations(
         x, y, _ = import_data.get_races_per_horse_number(
             source=source,
             n_horses=n_horses,
-            on_split="train",
+            on_split=SplitSets.TRAIN,
             x_format="sequential_per_horse",
             y_format="index_first",
         )
         x_val, y_val, _ = import_data.get_races_per_horse_number(
             source=source,
             n_horses=n_horses,
-            on_split="val",
+            on_split=SplitSets.VAL,
             x_format="flattened",
             y_format="index_first",
         )

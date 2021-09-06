@@ -8,6 +8,7 @@ import pandas as pd
 
 import winning_validation.errors
 from constants import Sources
+from constants import SplitSets
 from utils import import_data
 from utils import permutations
 from utils import preprocess
@@ -52,7 +53,7 @@ def train_on_each_horse_with_epochs(
             x, y, _ = import_data.get_races_per_horse_number(
                 source=source,
                 n_horses=n_horses,
-                on_split="train",
+                on_split=SplitSets.TRAIN,
                 x_format="sequential_per_horse",
                 y_format="first_position",
                 extra_features_func=extra_features_func,
@@ -63,7 +64,7 @@ def train_on_each_horse_with_epochs(
             x_val, y_val, _ = import_data.get_races_per_horse_number(
                 source=source,
                 n_horses=n_horses,
-                on_split="val",
+                on_split=SplitSets.VAL,
                 x_format="sequential_per_horse",
                 y_format="first_position",
                 extra_features_func=extra_features_func,
@@ -167,7 +168,7 @@ def pretrain_on_each_subraces(
         x_val, y_val, _ = import_data.get_races_per_horse_number(
             source=source,
             n_horses=n_horses,
-            on_split="val",
+            on_split=SplitSets.VAL,
             x_format="sequential_per_horse",
             y_format="first_position",
         )
@@ -184,7 +185,7 @@ def pretrain_on_each_subraces(
             x, rank, _ = import_data.get_races_per_horse_number(
                 source=source,
                 n_horses=cut_n_horses,
-                on_split="train",
+                on_split=SplitSets.TRAIN,
                 x_format="sequential_per_horse",
                 y_format="rank",
             )
@@ -325,9 +326,9 @@ def train_on_all_races(
         training_history["epochs"][epoch] = {"history": []}
         if verbose:
             print(f"Epoch {epoch}")
-        for x_race, y_race, _ in import_data.get_dataset_races(
+        for x_race, y_race, _ in import_data.iter_dataset_races(
             source=source,
-            on_split="train",
+            on_split=SplitSets.TRAIN,
             x_format="sequential_per_horse",
             y_format="first_position",
         ):

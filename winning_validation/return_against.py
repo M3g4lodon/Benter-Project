@@ -7,6 +7,8 @@ import numpy as np
 import pandas as pd
 
 from constants import PMU_MINIMUM_BET_SIZE
+from constants import Sources
+from constants import SplitSets
 from utils import expected_return
 from utils import import_data
 from winning_horse_models import AbstractWinningModel
@@ -76,7 +78,7 @@ def compute_return_against_odds(
         x_race, rank_race, race_dfs = import_data.get_races_per_horse_number(
             source=source,
             n_horses=n_horses,
-            on_split="val",
+            on_split=SplitSets.VAL,
             x_format="sequential_per_horse",
             y_format="rank",
             extra_features_func=extra_features_func,

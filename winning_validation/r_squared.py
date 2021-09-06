@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 
 from constants import Sources
+from constants import SplitSets
 from utils import import_data
 from winning_horse_models import AbstractWinningModel
 from winning_horse_models.baselines import RandomModel
@@ -82,7 +83,7 @@ def compute_predicted_proba_on_actual_races(
         x_race, rank_race, race_dfs = import_data.get_races_per_horse_number(
             source=source,
             n_horses=n_horses,
-            on_split="val",
+            on_split=SplitSets.VAL,
             x_format="sequential_per_horse",
             y_format="rank",
             extra_features_func=extra_features_func,

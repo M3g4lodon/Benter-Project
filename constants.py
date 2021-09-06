@@ -2,6 +2,7 @@ import collections
 import datetime as dt
 import os
 from enum import Enum
+from typing import Dict
 from typing import Optional
 
 TIMEZONE = "Europe/Paris"
@@ -11,6 +12,12 @@ class Sources(Enum):
     PMU = "PMU"
     UNIBET = "Unibet"
     ZETURF = "ZeTurf"
+
+
+class SplitSets(Enum):
+    TRAIN = "train"
+    VAL = "val"
+    TEST = "test"
 
 
 DATA_DIR = "./data"
@@ -130,7 +137,7 @@ class UnibetHorseSex(Enum):
         return False
 
 
-class UnibetBetRateType:
+class UnibetBetRateType(Enum):
     """As of Nov 27th 2020, found in Unibet JS code"""
 
     # Mise de base: 1€<br>Trouvez le 1er cheval de l’arrivée.
@@ -190,6 +197,8 @@ class UnibetBetRateType:
 
     # Mise de base: 1€<br>Trouvez le 1er cheval à l’arrivée gagnant ou placé.
     SIMPLE = 33
+
+    QUADRI_ORDER = -1  # From Unibet Rules
 
 
 class UnibetProbableType:
@@ -298,4 +307,22 @@ class UnibetCoat(Enum):
     MEDLEY_SABINO = "MEDLEY_SABINO"
 
 
+# https://www.unibet.fr/myaccount/reglement-paris-hippiques-195944301.html
+UNIBET_BETTINGS: Dict[UnibetBetRateType, float] = {
+    UnibetBetRateType.SIMPLE_WINNER: 1 - 0.85,
+    UnibetBetRateType.SIMPLE_PLACED: 1 - 0.82,
+    UnibetBetRateType.DEUZIO: 1 - 0.82,
+    UnibetBetRateType.LEBOULET: 1 - 0.82,
+    UnibetBetRateType.JUMELE_WINNER: 1 - 0.75,
+    UnibetBetRateType.JUMELE_ORDER: 1 - 0.74,
+    UnibetBetRateType.JUMELE_PLACED: 1 - 0.75,
+    UnibetBetRateType.TWO_OVER_FOUR: 1 - 0.75,
+    UnibetBetRateType.TRIO: 1 - 0.71,
+    UnibetBetRateType.QUADRI: 1 - 0.7,
+    UnibetBetRateType.QUADRI_ORDER: 1 - 0.7,
+    UnibetBetRateType.TRIO_ORDER: 1 - 0.7,
+    UnibetBetRateType.FIVE_OVER_FIVE: 1 - 0.65,
+}
+
+UNIBET_MINIMUM_BET_SIZE = 100  # 1.00€
 UNIBET_DATA_PATH = "./data/Unibet"

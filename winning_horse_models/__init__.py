@@ -142,3 +142,29 @@ class JoblibPicklerMixin:
 
 class ModelNotCreatedOnceError(Exception):
     pass
+
+
+class OddsCombinedWinningModel:
+    def __init__(self, alpha: float, beta: float, winning_model: AbstractWinningModel):
+        self._alpha = alpha
+        self._beta = beta
+        self._winning_model = winning_model
+
+    def predict(self, x: np.array, odds: np.array, **kwargs):
+        if np.all(np.isnan(odds)):
+            return np.full_like(np.expand_dims(odds, axis=0), np.nan)
+        winning_model_pred = self._winning_model.predict(x=x)
+        pari_mutual_proba = 1 / odds
+        combined_pred = np.exp(
+            self._alpha * np.log(winning_model_pred)
+            + self._beta * np.log(pari_mutual_proba)
+        )
+        denominator = np.exp(
+            self._alpha * np.log(winning_model_pred)
+            + self._beta * np.log(pari_mutual_proba)
+        )
+        denominator[np.isnan(denominator)] = 0
+        denominator = denominator.sum()
+        assert not np.isnan(denominator)
+        combined_pred /= denominator
+        return combined_pred

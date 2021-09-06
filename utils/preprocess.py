@@ -115,7 +115,7 @@ IF_NAN_IMPUTE_COLUMNS: Dict[Sources, Dict[str, Union[str, float]]] = {
     },
 }
 TO_LABEL_ENCODE_COLUMNS: Dict[Sources, dict] = {
-    Sources.PMU: [],
+    Sources.PMU: {},
     Sources.UNIBET: {
         "horse_show_ground": {
             "UNKNOWN": -1,

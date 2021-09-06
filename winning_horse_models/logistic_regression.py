@@ -6,6 +6,7 @@ import numpy as np
 import tensorflow as tf
 
 from constants import SAVED_MODELS_DIR
+from constants import SplitSets
 from utils import import_data
 from winning_horse_models import AbstractWinningModel
 from winning_horse_models import SequentialMixin
@@ -104,7 +105,7 @@ def compute_log_likelihood(intercept_weights):
         x, y, _ = import_data.get_races_per_horse_number(
             source=Sources.PMU,
             n_horses=n_horses,
-            on_split="train",
+            on_split=SplitSets.TRAIN,
             x_format="sequential_per_horse",
             y_format="index_first",
         )

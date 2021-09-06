@@ -1,5 +1,6 @@
 import itertools
 from typing import Callable
+from typing import Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -7,8 +8,13 @@ import pandas as pd
 import seaborn as sns
 from tqdm import tqdm
 
-from constants import PMU_BETTINGS, Sources
+from constants import PMU_BETTINGS
 from constants import PMU_MINIMUM_BET_SIZE
+from constants import Sources
+from constants import SplitSets
+from constants import UNIBET_BETTINGS
+from constants import UNIBET_MINIMUM_BET_SIZE
+from constants import UnibetBetRateType
 from utils import import_data
 from utils.expected_return import get_race_odds
 from wagering_stategies import race_betting_proportional_positive_return
@@ -23,28 +29,37 @@ DEFAULT_BET_SIZE = PMU_MINIMUM_BET_SIZE * 10
 #  expected winning proba, average length of loss streak...)
 
 
-def compute_expected_return(
+def _get_track_take(source: Sources, code_pari: Union[str, UnibetBetRateType]) -> float:
+    if source == Sources.PMU:
+        return [betting for betting in PMU_BETTINGS if betting.name == code_pari][0][1]
+    assert source == Sources.UNIBET, source
+    assert isinstance(code_pari, UnibetBetRateType), code_pari
+    return UNIBET_BETTINGS[code_pari]
+
+
+def compute_expected_return(  # R0914
     compute_betting_fun: Callable,
     source: Sources,
-    code_pari: str,
+    code_pari: Union[str, UnibetBetRateType],
     winning_model: AbstractWinningModel,
     bet_size: float = DEFAULT_BET_SIZE,
+    verbose: bool = False,
 ) -> pd.DataFrame:
     """For each races, compute expected return (1 basis)
     Without taking into account the feedback effect"""
-    assert bet_size > PMU_MINIMUM_BET_SIZE
+    assert bet_size > (
+        PMU_MINIMUM_BET_SIZE if source == Sources.PMU else UNIBET_MINIMUM_BET_SIZE
+    )
 
-    track_take = [betting for betting in PMU_BETTINGS if betting.name == code_pari][0][
-        1
-    ]
+    track_take = _get_track_take(source=source, code_pari=code_pari)
     records = []
     n_races = import_data.get_n_races(
-        source=source, on_split="val", remove_nan_previous_stakes=True
+        source=source, on_split=SplitSets.VAL, remove_nan_previous_stakes=True
     )
     for x_race, y_race, race_df in tqdm(
-        import_data.get_dataset_races(
+        import_data.iter_dataset_races(
             source=source,
-            on_split="val",
+            on_split=SplitSets.VAL,
             y_format="rank",
             x_format="sequential_per_horse",
             remove_nan_previous_stakes=True,
@@ -53,16 +68,28 @@ def compute_expected_return(
         total=n_races,
     ):
         # TODO get races per n_horses and sort the result dataframe
-        betting_race = compute_betting_fun(
-            x_race=x_race,
-            previous_stakes=race_df["totalEnjeu"],
-            winning_model=winning_model,
-            track_take=track_take,
-            capital_fraction=1.0,
-        )
+        if source == Sources.PMU:
+            betting_race = compute_betting_fun(
+                x_race=x_race,
+                previous_stakes=race_df["totalEnjeu"],
+                winning_model=winning_model,
+                track_take=track_take,
+                capital_fraction=1.0,
+            )
+        elif source == Sources.UNIBET:
+            betting_race = compute_betting_fun(
+                x_race=x_race,
+                odds=race_df["odds"].values,
+                winning_model=winning_model,
+                track_take=track_take,
+                capital_fraction=1.0,
+            )
+        else:
+            raise NotImplementedError(f"Compute Betting function on source {source}")
 
-        assert np.sum(betting_race) >= 0 or np.isclose(np.sum(betting_race), 0.0)
-        assert np.sum(betting_race) <= 1 or np.isclose(np.sum(betting_race), 1.0)
+        betting_race[np.isnan(betting_race)] = 0
+        assert np.nansum(betting_race) >= 0 or np.isclose(np.nansum(betting_race), 0.0)
+        assert np.nansum(betting_race) <= 1 or np.isclose(np.nansum(betting_race), 1.0)
 
         actual_betting = betting_race * bet_size
         actual_betting = np.where(
@@ -71,19 +98,33 @@ def compute_expected_return(
             np.round(actual_betting),
         )
 
+        if source == Sources.PMU:
+            odds_race = get_race_odds(
+                track_take=track_take,
+                previous_stakes=race_df["totalEnjeu"],
+                race_bet=actual_betting,
+            )
+        elif source == Sources.UNIBET:
+            odds_race = race_df["odds"]
+        else:
+            raise NotImplementedError("Other Source")
         expected_return = (
-            np.where(
-                y_race == 1,
-                get_race_odds(
-                    track_take=track_take,
-                    previous_stakes=race_df["totalEnjeu"],
-                    race_bet=actual_betting,
+            np.dot(
+                np.where(
+                    y_race == 1,
+                    odds_race,
+                    np.zeros_like(actual_betting),
                 ),
-                np.zeros_like(actual_betting),
-            ).sum()
+                actual_betting,
+            )
             - np.sum(actual_betting)
         )
+
         relative_expected_return = expected_return / np.sum(actual_betting)
+        if verbose:
+            print(
+                betting_race, actual_betting, expected_return, relative_expected_return
+            )
         records.append(
             {
                 "betting_fraction": betting_race.sum(),
@@ -93,7 +134,7 @@ def compute_expected_return(
                 "computed_bets_on_n_horses": np.sum(betting_race > 0.0),
                 "actual_bets_on_n_horses": np.sum(actual_betting > 0.0),
                 "n_horse": x_race.shape[0],
-                "date": race_df["date"].iloc[0],
+                "datetime": race_df["race_datetime"].iloc[0],
                 "race_id": race_df["race_id"].iloc[0],
             }
         )
@@ -187,7 +228,7 @@ def plot_expected_return(expected_return_df: pd.DataFrame) -> None:
         print("There is no winning streaks!")
 
 
-def compute_scenario(
+def compute_scenario(  # R0914
     compute_betting_fun: Callable,
     source: Sources,
     code_pari: str,
@@ -202,12 +243,12 @@ def compute_scenario(
     capital_value = START_CAPITAL
     records = []
     n_races = import_data.get_n_races(
-        source=source, on_split="val", remove_nan_previous_stakes=True
+        source=source, on_split=SplitSets.VAL, remove_nan_previous_stakes=True
     )
     for x_race, y_race, race_df in tqdm(
-        import_data.get_dataset_races(
+        import_data.iter_dataset_races(
             source=source,
-            on_split="val",
+            on_split=SplitSets.VAL,
             y_format="rank",
             x_format="sequential_per_horse",
             remove_nan_previous_stakes=True,
@@ -215,13 +256,25 @@ def compute_scenario(
         leave=False,
         total=n_races,
     ):
-        betting_race = compute_betting_fun(
-            x_race=x_race,
-            previous_stakes=race_df["totalEnjeu"],
-            track_take=track_take,
-            winning_model=winning_model,
-            capital_fraction=capital_fraction,
-        )
+        if source == Sources.PMU:
+            betting_race = compute_betting_fun(
+                x_race=x_race,
+                previous_stakes=race_df["totalEnjeu"],
+                track_take=track_take,
+                winning_model=winning_model,
+                capital_fraction=capital_fraction,
+            )
+        elif source == Sources.UNIBET:
+            betting_race = compute_betting_fun(
+                x_race=x_race,
+                odds=race_df["odds"].values,
+                track_take=track_take,
+                winning_model=winning_model,
+                capital_fraction=capital_fraction,
+            )
+        else:
+            raise NotImplementedError("Other Sources")
+        betting_race[np.isnan(betting_race)] = 0
         assert np.sum(betting_race) >= 0 or np.isclose(np.sum(betting_race), 0.0), (
             f"{betting_race} sum {np.sum(betting_race)} can not be below 0.0, "
             f"on race id {race_df['id'].iloc[0]}"
@@ -236,18 +289,21 @@ def compute_scenario(
         )
 
         capital_value_old = capital_value
-        capital_value += (
+        if source == Sources.PMU:
+            odds_race = get_race_odds(
+                track_take=track_take,
+                previous_stakes=race_df["totalEnjeu"],
+                race_bet=actual_betting,
+            )
+        elif source == Sources.UNIBET:
+            odds_race = race_df["odds"].values
+        else:
+            raise NotImplementedError("Other Sources")
+        capital_value += np.dot(
             np.where(
-                y_race == 1,
-                get_race_odds(
-                    track_take=track_take,
-                    previous_stakes=race_df["totalEnjeu"],
-                    race_bet=actual_betting,
-                ),
-                np.zeros_like(actual_betting),
-            ).sum()
-            - np.sum(actual_betting)
-        )
+                y_race == 1, odds_race, np.zeros_like(actual_betting), actual_betting
+            )
+        ) - np.sum(actual_betting)
 
         records.append(
             {
@@ -256,7 +312,7 @@ def compute_scenario(
                 "Relative Return": (capital_value - capital_value_old)
                 / capital_value_old,
                 "n_horse": x_race.shape[0],
-                "date": race_df["date"].iloc[0],
+                "datetime": race_df["race_datetime"].iloc[0],
                 "race_id": race_df["race_id"].iloc[0],
             }
         )
@@ -292,14 +348,24 @@ def plot_scenario(scenario_df: pd.DataFrame) -> None:
 
 def run():
     # pylint:disable=import-outside-toplevel
-    from winning_horse_models.baselines import RandomModel
 
-    compute_scenario(
-        compute_betting_fun=race_betting_proportional_positive_return,
-        source="PMU",
-        code_pari="E_SIMPLE_GAGNANT",
-        capital_fraction=0.01,
-        winning_model=RandomModel(),
+    from winning_horse_models import OddsCombinedWinningModel
+    from winning_horse_models.logistic_regression import LogisticRegressionModel
+
+    winning_model = OddsCombinedWinningModel(
+        alpha=0.3,
+        beta=0.8,
+        winning_model=LogisticRegressionModel.load_model(prefix="48_col_"),
+    )
+    import wagering_stategies
+
+    compute_betting_fun = wagering_stategies.race_betting_best_expected_return
+    _ = compute_expected_return(
+        compute_betting_fun=compute_betting_fun,
+        source=Sources.UNIBET,
+        code_pari=UnibetBetRateType.SIMPLE_WINNER,
+        winning_model=winning_model,
+        verbose=True,
     )
 
 

@@ -17,6 +17,7 @@ from joblib import Memory
 from constants import CACHE_DIR
 from constants import DATA_DIR
 from constants import Sources
+from constants import SplitSets
 from constants import TIMEZONE
 
 memory = Memory(location=CACHE_DIR, verbose=0)
@@ -125,19 +126,18 @@ def get_splitted_featured_data(
     return train_race_horse_df, val_race_horse_df, test_race_horse_df
 
 
-def get_split_date(source: Sources, on_split: str) -> pd.DataFrame:
+def get_split_date(source: Sources, on_split: SplitSets) -> pd.DataFrame:
     (
         train_race_horse_df,
         val_race_horse_df,
         test_race_horse_df,
     ) = get_splitted_featured_data(source)
-    assert on_split in {"train", "val", "test"}
 
-    if on_split == "train":
+    if on_split == SplitSets.TRAIN:
         return train_race_horse_df
-    if on_split == "val":
+    if on_split == SplitSets.VAL:
         return val_race_horse_df
-    # on_split == "test"
+    # on_split == SplitSets.TEST
     return test_race_horse_df
 
 
@@ -200,7 +200,7 @@ def extract_x_y(  # pylint:disable=too-many-branches
 def _get_races_per_horse_number(
     source: Sources,
     n_horses: int,
-    on_split: str,
+    on_split: SplitSets,
     y_format: str,
     remove_nan_odds: bool = False,
 ) -> Tuple[np.array, np.array, List[pd.DataFrame]]:
@@ -244,7 +244,7 @@ def _get_races_per_horse_number(
 def get_races_per_horse_number(
     source: Sources,
     n_horses: int,
-    on_split: str,
+    on_split: SplitSets,
     x_format: str,
     y_format: str,
     remove_nan_odds: bool = False,
@@ -278,10 +278,40 @@ def get_races_per_horse_number(
     return x, y, race_dfs
 
 
+def iter_dataset_races(
+    source: Sources,
+    on_split: SplitSets,
+    x_format: str,
+    y_format: str,
+    remove_nan_previous_stakes: bool = False,
+) -> Tuple[np.array, np.array, pd.DataFrame]:
+    rh_df = get_split_date(source=source, on_split=on_split)
+
+    for _, race_df in rh_df.groupby("race_id"):
+        x_race, y_race = extract_x_y(
+            race_df=race_df, source=source, x_format=x_format, y_format=y_format
+        )
+        if any([x_race is None, y_race is None]):
+            continue
+        if (
+            source == Sources.PMU
+            and np.any(np.isnan(race_df["totalEnjeu"]))
+            and remove_nan_previous_stakes
+        ):
+            continue
+        yield (
+            (
+                np.asarray(x_race).astype(np.float32),
+                np.asarray(y_race).astype(np.float32),
+                race_df,
+            )
+        )
+
+
 @memory.cache
 def get_dataset_races(
     source: Sources,
-    on_split: str,
+    on_split: SplitSets,
     x_format: str,
     y_format: str,
     remove_nan_previous_stakes: bool = False,
@@ -289,25 +319,16 @@ def get_dataset_races(
     """For the given data source, the given split, the given y_format,
     returns list of every races (features, y, race dataframe)"""
 
-    rh_df = get_split_date(source=source, on_split=on_split)
-
-    res = []
-    for _, race_df in rh_df.groupby("race_id"):
-        x_race, y_race = extract_x_y(
-            race_df=race_df, source=source, x_format=x_format, y_format=y_format
+    return [
+        res
+        for res in iter_dataset_races(
+            source=source,
+            on_split=on_split,
+            x_format=x_format,
+            y_format=y_format,
+            remove_nan_previous_stakes=remove_nan_previous_stakes,
         )
-        if any([x_race is None, y_race is None]):
-            continue
-        if np.any(np.isnan(race_df["totalEnjeu"])) and remove_nan_previous_stakes:
-            continue
-        res.append(
-            (
-                np.asarray(x_race).astype(np.float32),
-                np.asarray(y_race).astype(np.float32),
-                race_df,
-            )
-        )
-    return res
+    ]
 
 
 @memory.cache
@@ -321,10 +342,10 @@ def get_min_max_horse(source: Sources) -> Tuple[int, int]:
 
 @memory.cache
 def get_n_races(
-    source: Sources, on_split: str, remove_nan_previous_stakes: bool = False
+    source: Sources, on_split: SplitSets, remove_nan_previous_stakes: bool = False
 ) -> int:
     rh_df = get_split_date(source=source, on_split=on_split)
-    if remove_nan_previous_stakes:
+    if remove_nan_previous_stakes and source == Sources.PMU:
         return (
             rh_df.groupby("race_id")["totalEnjeu"]
             .agg(lambda s: np.logical_not(np.any(np.isnan(s))))
@@ -358,7 +379,7 @@ def run():
         )
 
         print("Counting number of races per dataset per number of horses")
-        for on_split in ["train", "val", "test"]:
+        for on_split in [SplitSets.TRAIN, SplitSets.VAL, SplitSets.TEST]:
             for n_horses in range(2, max_n_horses + 1):
                 print(
                     on_split,

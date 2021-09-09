@@ -23,6 +23,7 @@ class SplitSets(Enum):
 DATA_DIR = "./data"
 CACHE_DIR = "./cache"
 SAVED_MODELS_DIR = "./saved_models"
+LOGS_DIR = "./logs"
 PMU_DATA_DIR = os.path.join(DATA_DIR, Sources.PMU.value)
 UNIBET_DATA_DIR = os.path.join(DATA_DIR, Sources.UNIBET.value)
 

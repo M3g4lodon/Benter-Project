@@ -142,3 +142,4 @@ cache/
 data/
 saved_models/
 postgres-data/
+logs/

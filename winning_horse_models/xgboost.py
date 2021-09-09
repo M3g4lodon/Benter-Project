@@ -16,20 +16,44 @@ from winning_horse_models import ModelNotCreatedOnceError
 
 class XGBoostWinningModel(FlattenMixin, AbstractWinningModel):
 
-    # TODO(mathieu) Add n_features as attributes
     _NotFittedModelError = XGBoostError
 
-    def _create_n_horses_model(self, n_horses: int):
-        return XGBClassifier()
+    def __init__(
+        self, source: Sources, n_features: int, hyperparameters: Optional[dict] = None
+    ):
+        super().__init__(source=source, n_features=n_features)
+        self._hyperparameters = hyperparameters
 
-    def predict(self, x: np.array):
+    def _create_n_horses_model(self, n_horses: int):
+        if self._hyperparameters is None:
+            return XGBClassifier()
+        return XGBClassifier(**self._hyperparameters)
+
+    def predict(self, x: np.array, **kwargs):
+        n_races, n_horses, n_features = x.shape
         model = self.get_n_horses_model(n_horses=x.shape[1])
         try:
-            return model.predict_proba(
+            prediction = model.predict_proba(
                 data=np.reshape(
-                    a=x, newshape=(x.shape[0], x.shape[1] * x.shape[2]), order="F"
+                    a=x, newshape=(n_races, n_horses * n_features), order="F"
                 )
             )
+            # Can happen when training data doest not contain all horses position (aka classes)
+            # as winner
+            if model.n_classes_ != x.shape[1]:
+                missing_classes = [
+                    i for i in range(n_horses) if i not in model.classes_
+                ]
+                for idx in missing_classes:
+                    prediction = np.hstack(
+                        (
+                            prediction[:, :idx],
+                            np.zeros((n_races, 1)),
+                            prediction[:, idx:],
+                        )
+                    )
+            return prediction
+
         except self._NotFittedModelError:
             raise ModelNotCreatedOnceError
 
@@ -50,15 +74,16 @@ class XGBoostWinningModel(FlattenMixin, AbstractWinningModel):
             except NotFittedError as e:
                 print(f"Could not save model for {n_horse} horses: {e}")
 
+    # todo(mathieu) To be tested
     @classmethod
     def load_model(
-        cls, source: Sources, prefix: Optional[str] = None
+        cls, source: Sources, n_features: int, prefix: Optional[str] = None
     ) -> "XGBoostWinningModel":
-        model = XGBoostWinningModel(source=source)
+        model = XGBoostWinningModel(source=source, n_features=n_features)
         assert cls.__name__ in os.listdir(SAVED_MODELS_DIR)
         for filename in os.listdir(os.path.join(SAVED_MODELS_DIR, cls.__name__)):
             if filename.startswith(f"{prefix}{cls.__name__}"):
-                match = re.match(fr"{prefix}{cls.__name__}_(\d*)\.json", filename)
+                match = re.match(fr"{prefix}{cls.__name__}_(\d*)\.pickle", filename)
                 if not match:
                     continue
                 n_horse = int(match.group(1))
@@ -68,6 +93,3 @@ class XGBoostWinningModel(FlattenMixin, AbstractWinningModel):
                 )
                 assert model.n_horses_models[n_horse] is not None
         return model
-
-
-NotFittedError

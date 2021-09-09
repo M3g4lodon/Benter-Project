@@ -16,7 +16,7 @@ from utils.pmu_api_data import get_pmu_api_url
 from utils.pmu_api_data import get_race_horses_records
 from utils.scrape import execute_get_query
 from winning_horse_models import AbstractWinningModel
-from winning_horse_models.logistic_regression import LogisticRegressionModel
+from winning_horse_models.dl_shared_layers import LogisticRegressionModel
 
 TIMEZONE = "Europe/Paris"
 

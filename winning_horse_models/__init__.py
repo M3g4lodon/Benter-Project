@@ -2,6 +2,8 @@ import os
 import re
 from abc import ABC
 from abc import abstractmethod
+from typing import Any
+from typing import Dict
 from typing import Optional
 
 import joblib
@@ -18,10 +20,11 @@ class AbstractWinningModel(ABC):
 
     _NotFittedModelError: Optional[Exception] = None
 
-    def __init__(self, source: Sources):
+    def __init__(self, source: Sources, n_features: int):
         assert self._NotFittedModelError is not None
         self.source = source
-        self.n_horses_models = {}
+        self.n_features = n_features
+        self.n_horses_models: Dict[int, Any] = {}
 
     def get_n_horses_model(self, n_horses: int):
         if n_horses not in self.n_horses_models:
@@ -49,16 +52,11 @@ class AbstractWinningModel(ABC):
 
     @classmethod
     @abstractmethod
-    def load_model(cls) -> "AbstractWinningModel":
+    def load_model(cls, **kwargs) -> "AbstractWinningModel":
         pass
 
 
 class SequentialMixin:
-    def __init__(self, n_features: Optional[int], **kwargs):
-        assert self._NotFittedModelError is not None
-        self.n_horses_models = {}
-        self.n_features = n_features
-
     def predict(self, x: np.array, **kwargs):
         model = self.get_n_horses_model(n_horses=x.shape[1])
         try:

@@ -17,7 +17,6 @@ from constants import UNIBET_MINIMUM_BET_SIZE
 from constants import UnibetBetRateType
 from utils import import_data
 from utils.expected_return import get_race_odds
-from wagering_stategies import race_betting_proportional_positive_return
 from winning_horse_models import AbstractWinningModel
 
 START_CAPITAL = 100 * 100  # 100.00€
@@ -350,7 +349,7 @@ def run():
     # pylint:disable=import-outside-toplevel
 
     from winning_horse_models import OddsCombinedWinningModel
-    from winning_horse_models.logistic_regression import LogisticRegressionModel
+    from winning_horse_models.dl_shared_layers import LogisticRegressionModel
 
     winning_model = OddsCombinedWinningModel(
         alpha=0.3,

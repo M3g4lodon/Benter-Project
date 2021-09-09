@@ -88,6 +88,56 @@ class LogisticRegressionModel(SequentialMixin, AbstractWinningModel):
         return model
 
 
+class DLSharedLayersModel(SequentialMixin, AbstractWinningModel):
+
+    _NotFittedModelError = _ShouldNotBeTriggeredException
+
+    def __init__(self, shared_layers: tf.keras.Sequential, name: str, **kwargs):
+        super().__init__(**kwargs)
+        self.name = name
+        self.shared_layers = shared_layers
+
+    def _create_n_horses_model(self, n_horses: int):
+        inputs = tf.keras.Input(shape=(n_horses, self.n_features))
+        unstacked = tf.keras.layers.Lambda(lambda x: tf.unstack(x, axis=1))(inputs)
+        dense_outputs = [self.shared_layers(x) for x in unstacked]  # our shared layer
+        merged = tf.keras.layers.Lambda(lambda x: tf.stack(x, axis=1))(dense_outputs)
+        outputs = tf.keras.layers.Reshape(target_shape=(n_horses,))(merged)
+        outputs = tf.keras.layers.Lambda(
+            lambda x: tf.keras.activations.softmax(x, axis=-1)
+        )(outputs)
+
+        model = tf.keras.Model(inputs=inputs, outputs=outputs)
+        model.compile(
+            loss="categorical_crossentropy",
+            optimizer="rmsprop",
+            metrics=["categorical_accuracy", "categorical_crossentropy"],
+        )
+        model.build(input_shape=(None, n_horses, self.n_features))
+        return model
+
+    def save_model(self, prefix: Optional[str] = None) -> None:
+        if self.__class__.__name__ not in os.listdir(SAVED_MODELS_DIR):
+            os.mkdir(os.path.join(SAVED_MODELS_DIR, self.__class__.__name__))
+        prefix = prefix or ""
+        path = os.path.join(
+            SAVED_MODELS_DIR,
+            self.__class__.__name__,
+            f"{prefix}{self.name}_model",
+        )
+        self.shared_layers.save(filepath=path)
+
+    @classmethod
+    def load_model(
+        cls, name: str, prefix: Optional[str] = None
+    ) -> "DLSharedLayersModel":
+        prefix = prefix or ""
+        path = (os.path.join(SAVED_MODELS_DIR, cls.__name__, f"{prefix}{name}_model"),)
+
+        model = cls(name=name, shared_layers=tf.keras.models.load_model(path))
+        return model
+
+
 from joblib import Parallel, delayed
 from scipy import optimize
 
@@ -136,8 +186,8 @@ def minus_log_likelihood(intercept_weights):
 
 
 class ClassesFreeMultinomialLogisticRegression(SequentialMixin, AbstractWinningModel):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         # Use old
         with open(
             "./saved_models/LogisticRegressionModel/shared_weights.json", "r"

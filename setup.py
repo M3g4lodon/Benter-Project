@@ -29,6 +29,7 @@ setuptools.setup(
         "xgboost",
         "lightgbm",
         "tensorflow",
+        "tensorboard",
         "jupyterlab",
         "python-Levenshtein",
         "nltk",

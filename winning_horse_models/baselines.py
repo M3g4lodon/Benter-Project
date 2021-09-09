@@ -9,7 +9,7 @@ class RandomModel(SequentialMixin, AbstractWinningModel):
     _NotFittedModelError = Exception("This exception should not be triggered")
 
     def __init__(self):
-        super().__init__(n_features=None)
+        super().__init__(n_features=None, source=None)
 
     def _create_n_horses_model(self, n_horses: int):
         class RandomBaseline:

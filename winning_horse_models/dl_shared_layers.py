@@ -1,5 +1,8 @@
 import json
 import os
+from typing import Any
+from typing import Callable
+from typing import Dict
 from typing import Optional
 
 import numpy as np
@@ -7,6 +10,8 @@ import tensorflow as tf
 
 from constants import SAVED_MODELS_DIR
 from constants import SplitSets
+from constants import XFormats
+from constants import YFormats
 from utils import import_data
 from winning_horse_models import AbstractWinningModel
 from winning_horse_models import SequentialMixin
@@ -138,6 +143,75 @@ class DLSharedLayersModel(SequentialMixin, AbstractWinningModel):
         return model
 
 
+class DLLayersGeneratorModel(SequentialMixin, AbstractWinningModel):
+
+    _NotFittedModelError = _ShouldNotBeTriggeredException
+
+    def __init__(
+        self,
+        name: str,
+        hyperparameters: Optional[dict] = None,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.name = name
+        self._layers_per_n_horses: Dict[int, Any] = {}
+        self._hyperparameters = hyperparameters
+
+    def get_layers(self, hyperparameters: Optional[dict] = None):
+        if hyperparameters is None:
+            return tf.keras.layers.Dense(1)
+        if len(hyperparameters["layers"]) == 1:
+            layer = hyperparameters["layers"][0]
+            assert layer["type"] == "Dense"
+            return tf.keras.layers.Dense(layer["n_units"])
+
+        assert hyperparameters["layers"][-1]["n_units"] == 1
+        layers = []
+        for layer in hyperparameters["layers"]:
+            assert layer["type"] in ("Dense", "Dropout")
+            if layer["type"] == "Dense":
+                params = {"units": layer["n_units"]}
+                if "kernel_regularizer" in layer:
+                    assert layer["kernel_regularizer"]["type"] == "l2"
+                    params["kernel_regularizer"] = tf.keras.regularizers.l2(
+                        l2=layer["kernel_regularizer"]["l2"]
+                    )
+                layers.append(tf.keras.layers.Dense(**params))
+                continue
+            layers.append(tf.keras.layers.Dropout(layer["rate"]))
+        return tf.keras.Sequential(layers=layers)
+
+    def _create_n_horses_model(self, n_horses: int):
+        self._layers_per_n_horses[n_horses] = self.get_layers(self._hyperparameters)
+        inputs = tf.keras.Input(shape=(n_horses, self.n_features))
+        unstacked = tf.keras.layers.Lambda(lambda x: tf.unstack(x, axis=1))(inputs)
+        dense_outputs = [
+            self._layers_per_n_horses[n_horses](x) for x in unstacked
+        ]  # our generated layer
+        merged = tf.keras.layers.Lambda(lambda x: tf.stack(x, axis=1))(dense_outputs)
+        outputs = tf.keras.layers.Reshape(target_shape=(n_horses,))(merged)
+        outputs = tf.keras.layers.Lambda(
+            lambda x: tf.keras.activations.softmax(x, axis=-1)
+        )(outputs)
+
+        model = tf.keras.Model(inputs=inputs, outputs=outputs)
+        model.compile(
+            loss="categorical_crossentropy",
+            optimizer="rmsprop",
+            metrics=["categorical_accuracy", "categorical_crossentropy"],
+        )
+        model.build(input_shape=(None, n_horses, self.n_features))
+        return model
+
+    def save_model(self, prefix: Optional[str] = None):
+        raise NotImplementedError
+
+    @classmethod
+    def load_model(cls, name: str, prefix: Optional[str] = None):
+        raise NotImplementedError
+
+
 from joblib import Parallel, delayed
 from scipy import optimize
 
@@ -156,8 +230,8 @@ def compute_log_likelihood(intercept_weights):
             source=Sources.PMU,
             n_horses=n_horses,
             on_split=SplitSets.TRAIN,
-            x_format="sequential_per_horse",
-            y_format="index_first",
+            x_format=XFormats.SEQUENTIAL,
+            y_format=YFormats.INDEX_FIRST,
         )
         n_races = y.shape[0]
         if n_races == 0:

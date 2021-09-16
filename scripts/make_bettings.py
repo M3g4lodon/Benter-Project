@@ -9,6 +9,8 @@ from tabulate import tabulate
 import wagering_stategies
 from constants import PMU_BETTINGS
 from constants import Sources
+from constants import XFormats
+from constants import YFormats
 from utils import features
 from utils import import_data
 from utils.pmu_api_data import convert_queried_data_to_race_horse_df
@@ -77,8 +79,8 @@ def append_bettings_to_race_df(
     x_race, _ = import_data.extract_x_y(
         race_df=race_df,
         source=Sources.PMU,
-        x_format="sequential_per_horse",
-        y_format="first_position",
+        x_format=XFormats.SEQUENTIAL,
+        y_format=YFormats.FIRST_POSITION,
         ignore_y=True,
     )
 

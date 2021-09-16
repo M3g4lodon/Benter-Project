@@ -1,7 +1,7 @@
 from typing import Optional
 
-from lightgbm import LGBMClassifier
-from lightgbm.compat import LGBMNotFittedError
+from catboost import CatBoostClassifier
+from catboost import CatboostError
 
 from constants import Sources
 from winning_horse_models import AbstractWinningModel
@@ -9,8 +9,8 @@ from winning_horse_models import FlattenMixin
 from winning_horse_models import JoblibPicklerMixin
 
 
-class LGBMWinningModel(FlattenMixin, JoblibPicklerMixin, AbstractWinningModel):
-    _NotFittedModelError = LGBMNotFittedError
+class CatboostWinningModel(FlattenMixin, JoblibPicklerMixin, AbstractWinningModel):
+    _NotFittedModelError = CatboostError
 
     def __init__(
         self, source: Sources, n_features: int, hyperparameters: Optional[dict] = None
@@ -20,5 +20,5 @@ class LGBMWinningModel(FlattenMixin, JoblibPicklerMixin, AbstractWinningModel):
 
     def _create_n_horses_model(self, n_horses: int):
         if self._hyperparameters is None:
-            return LGBMClassifier()
-        return LGBMClassifier(**self._hyperparameters)
+            return CatBoostClassifier()
+        return CatBoostClassifier(**self._hyperparameters)

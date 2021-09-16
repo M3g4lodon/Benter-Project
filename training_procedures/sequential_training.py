@@ -13,6 +13,8 @@ import winning_validation.errors
 from constants import LOGS_DIR
 from constants import Sources
 from constants import SplitSets
+from constants import XFormats
+from constants import YFormats
 from utils import import_data
 from utils import permutations
 from utils import preprocess
@@ -26,29 +28,36 @@ def train_on_n_horses(
     n_epochs: int,
     n_horses: int,
     n_epochs_per_n_horses: int,
-    features_index: list,
+    features_index: Optional[List[int]] = None,
     selected_features_index: Optional[List[int]] = None,
     extra_features_func: Optional[Callable[[pd.DataFrame], pd.DataFrame]] = None,
     verbose: bool = False,
+    preprocessing: bool = True,
 ) -> Tuple[AbstractWinningModel, dict]:
+    if n_epochs == 0 and verbose:
+        print("Importing training data...")
     x, y, _ = import_data.get_races_per_horse_number(
         source=source,
         n_horses=n_horses,
         on_split=SplitSets.TRAIN,
-        x_format="sequential_per_horse",
-        y_format="first_position",
+        x_format=XFormats.SEQUENTIAL,
+        y_format=YFormats.FIRST_POSITION,
         extra_features_func=extra_features_func,
+        preprocessing=preprocessing,
     )
     if selected_features_index and x.size != 0:
         x = x[:, :, features_index]
 
+    if n_epochs == 0 and verbose:
+        print("Importing validation data...")
     x_val, y_val, _ = import_data.get_races_per_horse_number(
         source=source,
         n_horses=n_horses,
         on_split=SplitSets.VAL,
-        x_format="sequential_per_horse",
-        y_format="first_position",
+        x_format=XFormats.SEQUENTIAL,
+        y_format=YFormats.FIRST_POSITION,
         extra_features_func=extra_features_func,
+        preprocessing=preprocessing,
     )
     if selected_features_index and x_val.size != 0:
         x_val = x_val[:, :, features_index]
@@ -60,6 +69,16 @@ def train_on_n_horses(
         log_dir=log_dir,
         histogram_freq=1,
     )
+    early_stopping_callback = tf.keras.callbacks.EarlyStopping(
+        monitor="val_loss",
+        min_delta=0,
+        patience=250,
+        verbose=int(verbose),
+        mode="min",
+        baseline=None,
+        restore_best_weights=True,
+    )
+
     training_history = {
         "n_training_races": x.shape[0],
         "n_validation_races": x_val.shape[0],
@@ -100,7 +119,7 @@ def train_on_n_horses(
             y=y,
             verbose=int(verbose),
             epochs=n_epochs_per_n_horses,
-            callbacks=[tensorboard_callback],
+            callbacks=[tensorboard_callback, early_stopping_callback],
         )
     else:
         history = winning_model.fit(
@@ -109,7 +128,7 @@ def train_on_n_horses(
             validation_data=(x_val, y_val),
             verbose=int(verbose),
             epochs=n_epochs_per_n_horses,
-            callbacks=[tensorboard_callback],
+            callbacks=[tensorboard_callback, early_stopping_callback],
         )
     loss_per_horse = history.history["loss"][0] / n_horses
     accuracy = history.history["categorical_accuracy"][0]
@@ -207,6 +226,7 @@ def pretrain_on_each_subraces(
     winning_model: AbstractWinningModel,
     n_permutations: int,
     verbose: bool = False,
+    preprocessing: bool = True,
 ) -> Tuple[AbstractWinningModel, dict]:
     min_horse, max_horse = import_data.get_min_max_horse(source=source)
     pretraining_history = {
@@ -223,8 +243,9 @@ def pretrain_on_each_subraces(
             source=source,
             n_horses=n_horses,
             on_split=SplitSets.VAL,
-            x_format="sequential_per_horse",
-            y_format="first_position",
+            x_format=XFormats.SEQUENTIAL,
+            y_format=YFormats.FIRST_POSITION,
+            preprocessing=preprocessing,
         )
 
         cut_permuted_xs = []
@@ -240,8 +261,9 @@ def pretrain_on_each_subraces(
                 source=source,
                 n_horses=cut_n_horses,
                 on_split=SplitSets.TRAIN,
-                x_format="sequential_per_horse",
-                y_format="rank",
+                x_format=XFormats.SEQUENTIAL,
+                y_format=YFormats.RANK,
+                preprocessing=preprocessing,
             )
             if x.size == 0:
                 if verbose:
@@ -383,8 +405,8 @@ def train_on_all_races(
         for x_race, y_race, _ in import_data.iter_dataset_races(
             source=source,
             on_split=SplitSets.TRAIN,
-            x_format="sequential_per_horse",
-            y_format="first_position",
+            x_format=XFormats.SEQUENTIAL,
+            y_format=YFormats.FIRST_POSITION,
         ):
             n_horses = x_race.shape[0]
             model = winning_model.get_n_horses_model(n_horses=n_horses)

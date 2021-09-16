@@ -83,10 +83,8 @@ class FlattenMixin:
         model = self.get_n_horses_model(n_horses=x.shape[1])
 
         return model.fit(
-            x=np.reshape(
-                a=x, newshape=(x.shape[0], x.shape[1] * x.shape[2]), order="F"
-            ),
-            y=y,
+            np.reshape(a=x, newshape=(x.shape[0], x.shape[1] * x.shape[2]), order="F"),
+            y,
             **kwargs,
         )
 
@@ -94,7 +92,7 @@ class FlattenMixin:
         model = self.get_n_horses_model(n_horses=x.shape[1])
         try:
             return model.predict_proba(
-                X=np.reshape(
+                np.reshape(
                     a=x, newshape=(x.shape[0], x.shape[1] * x.shape[2]), order="F"
                 ),
                 **kwargs,

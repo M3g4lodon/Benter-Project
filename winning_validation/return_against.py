@@ -9,6 +9,8 @@ import pandas as pd
 from constants import PMU_MINIMUM_BET_SIZE
 from constants import Sources
 from constants import SplitSets
+from constants import XFormats
+from constants import YFormats
 from utils import expected_return
 from utils import import_data
 from winning_horse_models import AbstractWinningModel
@@ -53,6 +55,7 @@ def compute_return_against_odds(
     winning_model: AbstractWinningModel,
     selected_features_index: Optional[List[int]] = None,
     extra_features_func: Optional[Callable[[pd.DataFrame], pd.DataFrame]] = None,
+    preprocessing: bool = True,
     verbose: bool = False,
 ) -> dict:
     assert len(set(selected_features_index)) == len(selected_features_index)
@@ -79,9 +82,10 @@ def compute_return_against_odds(
             source=source,
             n_horses=n_horses,
             on_split=SplitSets.VAL,
-            x_format="sequential_per_horse",
-            y_format="rank",
+            x_format=XFormats.SEQUENTIAL,
+            y_format=YFormats.RANK,
             extra_features_func=extra_features_func,
+            preprocessing=preprocessing,
         )
 
         if selected_features_index and x_race.size != 0:

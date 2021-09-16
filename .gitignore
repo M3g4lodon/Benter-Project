@@ -143,3 +143,4 @@ data/
 saved_models/
 postgres-data/
 logs/
+catboost_info/

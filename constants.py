@@ -8,16 +8,27 @@ from typing import Optional
 TIMEZONE = "Europe/Paris"
 
 
-class Sources(Enum):
+class Sources(str, Enum):
     PMU = "PMU"
     UNIBET = "Unibet"
     ZETURF = "ZeTurf"
 
 
-class SplitSets(Enum):
+class SplitSets(str, Enum):
     TRAIN = "train"
     VAL = "val"
     TEST = "test"
+
+
+class XFormats(str, Enum):
+    FLATTENED = "flattened"
+    SEQUENTIAL = "sequential"
+
+
+class YFormats(str, Enum):
+    INDEX_FIRST = "index_first"
+    RANK = "rank"
+    FIRST_POSITION = "first_position"
 
 
 DATA_DIR = "./data"

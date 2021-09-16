@@ -2,13 +2,14 @@ from typing import Callable
 from typing import Dict
 from typing import List
 from typing import Optional
-from typing import Union
 
 import numpy as np
 import pandas as pd
 
 from constants import Sources
 from constants import SplitSets
+from constants import XFormats
+from constants import YFormats
 from utils import import_data
 from winning_horse_models import AbstractWinningModel
 from winning_horse_models.baselines import RandomModel
@@ -51,6 +52,7 @@ def compute_predicted_proba_on_actual_races_on_n_horses(
     winning_model: AbstractWinningModel,
     selected_features_index: Optional[List[int]] = None,
     extra_features_func: Optional[Callable[[pd.DataFrame], pd.DataFrame]] = None,
+    preprocessing: bool = True,
     verbose: bool = False,
 ) -> Optional[dict]:
     assert k > 0
@@ -72,9 +74,10 @@ def compute_predicted_proba_on_actual_races_on_n_horses(
         source=source,
         n_horses=n_horses,
         on_split=SplitSets.VAL,
-        x_format="sequential_per_horse",
-        y_format="rank",
+        x_format=XFormats.SEQUENTIAL,
+        y_format=YFormats.RANK,
         extra_features_func=extra_features_func,
+        preprocessing=preprocessing,
     )
 
     if selected_features_index and x_race.size != 0:
@@ -243,12 +246,15 @@ def compute_mcfadden_r_squared_on_n_horses(
     assert np.all(proba["random_probabilities"] > 0)
 
     model_proba = proba["predicted_probabilities"][proba["odds_probabilities"] > 0]
+    model_proba = np.maximum(model_proba, 1e-5)  # to prevent -inf r²
     model_r_squared = 1 - np.sum(np.log(model_proba)) / (-n_races * np.log(n_horses))
 
     odds_proba = proba["odds_probabilities"][proba["odds_probabilities"] > 0]
+    odds_proba = np.maximum(odds_proba, 1e-5)
     odds_r_squared = 1 - np.sum(np.log(odds_proba)) / (-n_races * np.log(n_horses))
 
     random_proba = proba["random_probabilities"][proba["odds_probabilities"] > 0]
+    random_proba = np.maximum(random_proba, 1e-5)
     random_r_squared = 1 - np.sum(np.log(random_proba)) / (
         -n_races * np.log(n_horses)
     )  # Should be close to zero

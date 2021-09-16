@@ -6,6 +6,8 @@ from sklearn import metrics
 
 from constants import Sources
 from constants import SplitSets
+from constants import XFormats
+from constants import YFormats
 from utils import import_data
 from utils import permutations
 from winning_horse_models import AbstractWinningModel
@@ -42,20 +44,27 @@ def train_on_n_horses_races(
     winning_model: AbstractWinningModel,
     n_horses: int,
     verbose: bool = False,
+    preprocessing: bool = True,
 ) -> Tuple[AbstractWinningModel, dict]:
+    if verbose:
+        print("Importing training data...")
     x, y, _ = import_data.get_races_per_horse_number(
         source=source,
         n_horses=n_horses,
         on_split=SplitSets.TRAIN,
-        x_format="flattened",
-        y_format="index_first",
+        x_format=XFormats.FLATTENED,
+        y_format=YFormats.INDEX_FIRST,
+        preprocessing=preprocessing,
     )
+    if verbose:
+        print("Importing validation data...")
     x_val, y_val, _ = import_data.get_races_per_horse_number(
         source=source,
         n_horses=n_horses,
         on_split=SplitSets.VAL,
-        x_format="flattened",
-        y_format="index_first",
+        x_format=XFormats.FLATTENED,
+        y_format=YFormats.INDEX_FIRST,
+        preprocessing=preprocessing,
     )
 
     training_history_n_horses = {
@@ -90,10 +99,11 @@ def train_on_n_horses_races(
 
     if verbose:
         y_pred = model.predict_proba(x)
-        y_pred = _extend_y_pred_with_unseen_classes(
-            missing_indexes=[i for i in range(n_horses) if i not in model.classes_],
-            y_pred=y_pred,
-        )
+        if hasattr(model, "classes_"):
+            y_pred = _extend_y_pred_with_unseen_classes(
+                missing_indexes=[i for i in range(n_horses) if i not in model.classes_],
+                y_pred=y_pred,
+            )
 
         y_true = _one_hot_encode(y, n_horses=n_horses)
         if np.any(np.isnan(y_pred)):
@@ -111,10 +121,13 @@ def train_on_n_horses_races(
 
         else:
             y_pred = model.predict_proba(x_val)
-            y_pred = _extend_y_pred_with_unseen_classes(
-                missing_indexes=[i for i in range(n_horses) if i not in model.classes_],
-                y_pred=y_pred,
-            )
+            if hasattr(model, "classes_"):
+                y_pred = _extend_y_pred_with_unseen_classes(
+                    missing_indexes=[
+                        i for i in range(n_horses) if i not in model.classes_
+                    ],
+                    y_pred=y_pred,
+                )
             y_true = _one_hot_encode(y_val, n_horses=n_horses)
             if np.any(np.isnan(y_pred)):
                 print(
@@ -176,6 +189,7 @@ def train_per_n_horses_races_with_permutations(
     winning_model: AbstractWinningModel,
     n_permuted_races: int,
     verbose: bool = False,
+    preprocessing: bool = True,
 ) -> Tuple[AbstractWinningModel, dict]:
     """Train Sklearn-like model on each permutated n_horses-size races,
     Returns trained model and training history"""
@@ -192,15 +206,17 @@ def train_per_n_horses_races_with_permutations(
             source=source,
             n_horses=n_horses,
             on_split=SplitSets.TRAIN,
-            x_format="sequential_per_horse",
-            y_format="index_first",
+            x_format=XFormats.SEQUENTIAL,
+            y_format=YFormats.INDEX_FIRST,
+            preprocessing=preprocessing,
         )
         x_val, y_val, _ = import_data.get_races_per_horse_number(
             source=source,
             n_horses=n_horses,
             on_split=SplitSets.VAL,
-            x_format="flattened",
-            y_format="index_first",
+            x_format=XFormats.FLATTENED,
+            y_format=YFormats.INDEX_FIRST,
+            preprocessing=preprocessing,
         )
 
         training_history["n_horses_history"][n_horses] = {

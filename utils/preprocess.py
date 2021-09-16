@@ -341,8 +341,12 @@ def get_n_preprocessed_feature_columns(source: Sources) -> int:
     return res
 
 
-def preprocess(race_horse_df: pd.DataFrame, source: Sources) -> pd.DataFrame:
+def preprocess(
+    race_horse_df: pd.DataFrame, source: Sources, preprocessing: bool = True
+) -> pd.DataFrame:
     features_df = race_horse_df[FEATURE_COLUMNS[source]]
+    if not preprocessing:
+        return features_df
     standard_scaler_parameters, ohe_features_values = load_preprocess(source=source)
     for feature_name in CUSTOM_COLUMNS[source]:
         if feature_name == "rope_n" and source == Sources.UNIBET:

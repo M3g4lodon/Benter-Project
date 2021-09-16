@@ -15,6 +15,8 @@ from constants import SplitSets
 from constants import UNIBET_BETTINGS
 from constants import UNIBET_MINIMUM_BET_SIZE
 from constants import UnibetBetRateType
+from constants import XFormats
+from constants import YFormats
 from utils import import_data
 from utils.expected_return import get_race_odds
 from winning_horse_models import AbstractWinningModel
@@ -59,8 +61,8 @@ def compute_expected_return(  # R0914
         import_data.iter_dataset_races(
             source=source,
             on_split=SplitSets.VAL,
-            y_format="rank",
-            x_format="sequential_per_horse",
+            y_format=YFormats.RANK,
+            x_format=XFormats.SEQUENTIAL,
             remove_nan_previous_stakes=True,
         ),
         leave=False,
@@ -248,8 +250,8 @@ def compute_scenario(  # R0914
         import_data.iter_dataset_races(
             source=source,
             on_split=SplitSets.VAL,
-            y_format="rank",
-            x_format="sequential_per_horse",
+            y_format=YFormats.RANK,
+            x_format=XFormats.SEQUENTIAL,
             remove_nan_previous_stakes=True,
         ),
         leave=False,

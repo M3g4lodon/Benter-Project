@@ -13,7 +13,23 @@ from winning_horse_models import AbstractWinningModel
 from winning_horse_models import FlattenMixin
 from winning_horse_models import ModelNotCreatedOnceError
 
-
+# Best found {'colsample_bytree': 0.6868653078531703,
+#  'gamma': 1.3533016677310217,
+#  'max_depth': 4.0,
+#  'min_child_weight': 3.0,
+#  'n_estimators': 180.0,
+#  'reg_alpha': 40.0,
+#  'reg_lambda': 0.06703423674448061}
+# on 10 n_horses
+# R² 0.0716297958198091
+# space={'max_depth': hp.quniform("max_depth", 2, 10, 1),
+#     'gamma': hp.uniform ('gamma', 1,9),
+#     'reg_alpha' : hp.quniform('reg_alpha', 40,180,1),
+#     'reg_lambda' : hp.uniform('reg_lambda', 0,1),
+#     'colsample_bytree' : hp.uniform('colsample_bytree', 0.2,1),
+#     'min_child_weight' : hp.quniform('min_child_weight', 0, 10, 1),
+#     'n_estimators': hp.quniform('n_estimators', 20,180,1)
+# }
 class XGBoostWinningModel(FlattenMixin, AbstractWinningModel):
 
     _NotFittedModelError = XGBoostError

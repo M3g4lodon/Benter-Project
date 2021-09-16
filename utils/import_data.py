@@ -19,6 +19,8 @@ from constants import DATA_DIR
 from constants import Sources
 from constants import SplitSets
 from constants import TIMEZONE
+from constants import XFormats
+from constants import YFormats
 
 memory = Memory(location=CACHE_DIR, verbose=0)
 
@@ -143,17 +145,18 @@ def get_split_date(source: Sources, on_split: SplitSets) -> pd.DataFrame:
 
 def extract_x_y(  # pylint:disable=too-many-branches
     race_df: pd.DataFrame,
-    x_format: str,
-    y_format: str,
+    x_format: XFormats,
+    y_format: YFormats,
     source: Sources,
     ignore_y: bool = False,
+    preprocessing: bool = True,
 ) -> Tuple[Optional[np.array], Optional[np.array]]:
     """For a given race in `race_df` returns features, y in the asked format and odds"""
-    assert x_format in {"sequential_per_horse", "flattened"}
-    assert y_format in {"first_position", "rank", "index_first"}
     from utils import preprocess  # pylint:disable=cyclic-import,import-outside-toplevel
 
-    x_race = preprocess.preprocess(race_horse_df=race_df, source=source)
+    x_race = preprocess.preprocess(
+        race_horse_df=race_df, source=source, preprocessing=preprocessing
+    )
 
     if pd.isnull(x_race).mean().mean() > MAX_NAN_PROP:
         return None, None
@@ -164,7 +167,7 @@ def extract_x_y(  # pylint:disable=too-many-branches
 
     x_race = x_race.values
 
-    if x_format == "flattened":
+    if x_format == XFormats.FLATTENED:
         x_race = x_race.flatten(order="F")
 
     if race_df["horse_place"].isna().all() and not ignore_y:
@@ -174,13 +177,13 @@ def extract_x_y(  # pylint:disable=too-many-branches
         y_race[:] = np.NaN
 
     else:
-        if y_format == "first_position":
+        if y_format == YFormats.FIRST_POSITION:
             y_race = (race_df["horse_place"] == 1).values
             if y_race.sum() == 0:
                 return None, None
             assert y_race.sum() > 0
             y_race = y_race / y_race.sum()  # Beware that ExAequo is possible
-        elif y_format == "rank":
+        elif y_format == YFormats.RANK:
             y_race = race_df["horse_place"].values
             y_race[np.isnan(y_race)] = y_race.shape[0]
         else:  # y_format == 'index_first'
@@ -201,8 +204,9 @@ def _get_races_per_horse_number(
     source: Sources,
     n_horses: int,
     on_split: SplitSets,
-    y_format: str,
+    y_format: YFormats,
     remove_nan_odds: bool = False,
+    preprocessing: bool = True,
 ) -> Tuple[np.array, np.array, List[pd.DataFrame]]:
     """For the given source, the given split, the given number of horses per races,
     the given y_format,
@@ -220,9 +224,10 @@ def _get_races_per_horse_number(
 
         x_race, y_race = extract_x_y(
             race_df=race_df,
-            x_format="sequential_per_horse",
+            x_format=XFormats.SEQUENTIAL,
             y_format=y_format,
             source=source,
+            preprocessing=preprocessing,
         )
         if any([x_race is None, y_race is None]):
             continue
@@ -234,21 +239,24 @@ def _get_races_per_horse_number(
         y.append(y_race)
         race_dfs.append(race_df)
 
-    return (
-        np.asarray(x).astype(np.float32),
-        np.asarray(y).astype(np.float32),
-        race_dfs,
-    )
+    if preprocessing:
+        return (
+            np.asarray(x).astype(np.float32),
+            np.asarray(y).astype(np.float32),
+            race_dfs,
+        )
+    return np.asarray(x), np.asarray(y), race_dfs
 
 
 def get_races_per_horse_number(
     source: Sources,
     n_horses: int,
     on_split: SplitSets,
-    x_format: str,
-    y_format: str,
+    x_format: XFormats,
+    y_format: YFormats,
     remove_nan_odds: bool = False,
     extra_features_func: Optional[Callable[[pd.DataFrame], pd.DataFrame]] = None,
+    preprocessing: bool = True,
 ) -> Tuple[np.array, np.array, List[pd.DataFrame]]:
     """For the given source, the given split, the given number of horses per races,
     the given y_format,
@@ -257,16 +265,15 @@ def get_races_per_horse_number(
     We expect `extra_features_func` to return a DataFrame in the same format as race_df
     (column names are extra feature name, with the length of n_horses)"""
 
-    assert x_format in {"sequential_per_horse", "flattened"}
-
     x, y, race_dfs = _get_races_per_horse_number(
         source=source,
         n_horses=n_horses,
         on_split=on_split,
         y_format=y_format,
         remove_nan_odds=remove_nan_odds,
+        preprocessing=preprocessing,
     )
-    if x_format == "flattened" and x.size != 0:
+    if x_format == XFormats.FLATTENED and x.size != 0:
         x = np.reshape(a=x, newshape=(x.shape[0], x.shape[1] * x.shape[2]), order="F")
 
     if extra_features_func is not None and x.size != 0:
@@ -281,15 +288,20 @@ def get_races_per_horse_number(
 def iter_dataset_races(
     source: Sources,
     on_split: SplitSets,
-    x_format: str,
-    y_format: str,
+    x_format: XFormats,
+    y_format: YFormats,
     remove_nan_previous_stakes: bool = False,
+    preprocessing: bool = True,
 ) -> Tuple[np.array, np.array, pd.DataFrame]:
     rh_df = get_split_date(source=source, on_split=on_split)
 
     for _, race_df in rh_df.groupby("race_id"):
         x_race, y_race = extract_x_y(
-            race_df=race_df, source=source, x_format=x_format, y_format=y_format
+            race_df=race_df,
+            source=source,
+            x_format=x_format,
+            y_format=y_format,
+            preprocessing=preprocessing,
         )
         if any([x_race is None, y_race is None]):
             continue
@@ -312,8 +324,8 @@ def iter_dataset_races(
 def get_dataset_races(
     source: Sources,
     on_split: SplitSets,
-    x_format: str,
-    y_format: str,
+    x_format: XFormats,
+    y_format: YFormats,
     remove_nan_previous_stakes: bool = False,
 ) -> List[Tuple[np.array, np.array, pd.DataFrame]]:
     """For the given data source, the given split, the given y_format,
@@ -389,8 +401,8 @@ def run():
                             source=source,
                             n_horses=n_horses,
                             on_split=on_split,
-                            x_format="sequential_per_horse",
-                            y_format="rank",
+                            x_format=XFormats.SEQUENTIAL,
+                            y_format=YFormats.RANK,
                         )[0]
                     ),
                 )

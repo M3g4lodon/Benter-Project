@@ -9,6 +9,8 @@ from scipy.stats import stats
 
 from constants import Sources
 from constants import SplitSets
+from constants import XFormats
+from constants import YFormats
 from utils import import_data
 from utils import preprocess
 from winning_horse_models import AbstractWinningModel
@@ -49,6 +51,7 @@ def compute_validation_error(
     winning_model: AbstractWinningModel,
     selected_features_index: Optional[List[int]] = None,
     extra_features_func: Optional[Callable[[pd.DataFrame], pd.DataFrame]] = None,
+    preprocessing: bool = True,
     verbose: bool = False,
 ) -> dict:
     assert k > 0
@@ -85,9 +88,10 @@ def compute_validation_error(
             source=source,
             n_horses=n_horses,
             on_split=SplitSets.VAL,
-            x_format="sequential_per_horse",
-            y_format="rank",
+            x_format=XFormats.SEQUENTIAL,
+            y_format=YFormats.RANK,
             extra_features_func=extra_features_func,
+            preprocessing=preprocessing,
         )
 
         if selected_features_index and x_race.size != 0:
